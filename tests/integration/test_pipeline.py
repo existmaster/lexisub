@@ -1,9 +1,9 @@
 import shutil
 from pathlib import Path
 import pytest
-from mma_sub.db import repository
-from mma_sub.core import glossary
-from mma_sub.core.pipeline import process_video
+from lexisub.db import repository
+from lexisub.core import glossary
+from lexisub.core.pipeline import process_video
 
 VIDEO = Path(__file__).parent.parent / "fixtures" / "sample_speech.mp4"
 GLOSS = Path(__file__).parent.parent / "fixtures" / "glossary.csv"

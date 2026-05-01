@@ -1,4 +1,4 @@
-from mma_sub import config
+from lexisub import config
 
 
 def test_app_data_dir_is_absolute():

@@ -3,7 +3,7 @@ import shutil
 import subprocess
 from pathlib import Path
 import pytest
-from mma_sub.core.muxer import mux_subtitle
+from lexisub.core.muxer import mux_subtitle
 
 VIDEO = Path(__file__).parent.parent / "fixtures" / "sample_30s.mp4"
 SRT = Path(__file__).parent.parent / "fixtures" / "sample.srt"

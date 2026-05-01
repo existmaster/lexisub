@@ -1,6 +1,6 @@
 import pytest
-from mma_sub.core.subtitle import Cue
-from mma_sub.core.translator import translate
+from lexisub.core.subtitle import Cue
+from lexisub.core.translator import translate
 
 pytestmark = pytest.mark.heavy
 

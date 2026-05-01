@@ -1,8 +1,8 @@
 from __future__ import annotations
 from pathlib import Path
 import mlx_whisper
-from mma_sub.core.subtitle import Cue
-from mma_sub import config
+from lexisub.core.subtitle import Cue
+from lexisub import config
 
 
 def transcribe(audio_path: Path, model_id: str | None = None) -> tuple[list[Cue], str]:

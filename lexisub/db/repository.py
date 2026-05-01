@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 def _read_schema() -> str:
-    return resources.files("mma_sub.db").joinpath("schema.sql").read_text(
+    return resources.files("lexisub.db").joinpath("schema.sql").read_text(
         encoding="utf-8"
     )
 

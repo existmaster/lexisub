@@ -1,14 +1,27 @@
-# MMA Subtitle Tool
+# Lexisub
 
-Local desktop app: video → Korean subtitles, MMA glossary applied.
+Local desktop app: any video → Korean subtitles, with your own custom glossary applied so domain terms get translated consistently.
 
-Built for 독진수 trainer. M1 Mac (Apple Silicon) only.
+Built and tested for MMA training videos initially (the trainer 독진수's use case), but works for any domain — medical lectures, legal seminars, technical tutorials — by importing your own term glossary.
+
+Apple Silicon Mac only. Runs entirely locally; no cloud API calls.
 
 ## Setup
 ```
 uv sync
-uv run mma-sub
+uv run lexisub
 ```
+
+## How it works
+1. Drop a video into the app.
+2. Local Whisper (mlx-whisper large-v3-turbo) transcribes it.
+3. Local Gemma 3 4B (mlx-lm) translates each line to Korean, with your approved glossary terms forced verbatim.
+4. The Korean `.srt` is written next to the video, and an `.mkv` with the subtitle track muxed in is produced (no re-encoding).
+
+## Glossary
+- Import a CSV with columns `source_lang, source_term, ko_term, category` from the 용어집 tab.
+- Approved terms are injected into the translator's system prompt — they will be used as-is in the output.
+- Example: `tests/fixtures/glossary.csv` has 4 MMA grappling terms.
 
 ## Tests
 ```
@@ -17,51 +30,17 @@ uv run pytest -m heavy              # 3 model-download tests (~4GB, slow)
 ```
 
 ## Requirements
-- Python 3.12, Apple Silicon Mac, ffmpeg (`brew install ffmpeg`)
+- Apple Silicon Mac (M1/M2/M3/M4)
+- Python 3.12 (auto-installed by uv)
+- ffmpeg: `brew install ffmpeg`
+- Internet on first run (~4GB models auto-download to HuggingFace cache)
+- ~6GB free disk
 
-## Status (MVP v0.1.0-rc)
+## Known limitations
+- Korean output only (other target languages are roadmap)
+- No GUI for editing subtitles before mux (next milestone)
+- No PDF auto-extraction of glossaries yet (next milestone)
+- Not packaged as `.app` yet — runs via `uv run lexisub`
 
-Tasks 1–15 of `business/work/독진수-mma-자막-앱/2026-05-01-plan-mvp.md` complete:
-
-- Project bootstrap, config, SQLite glossary DB
-- SRT parsing/serialization (pure)
-- Glossary CSV import + system-prompt builder
-- Translator chunking with timestamp preservation (pure)
-- ffmpeg audio extraction + subtitle mux (stream copy, no re-encoding)
-- mlx-whisper STT wrapper (large-v3-turbo)
-- mlx-lm translation wrapper (Gemma 3 4B 4-bit) with glossary injection + retry
-- End-to-end pipeline orchestration with sequential model loading (8GB-safe)
-- PySide6 GUI: main window, video processing tab (drag-drop + worker thread), glossary tab (CSV import + approve toggle)
-
-35 quick tests passing, 3 heavy tests deferred to manual verification.
-
-## Pending: Task 16 — Manual end-to-end verification
-
-The following must be done on the trainer's machine (or any M1 Mac with internet):
-
-1. **Heavy test run** (downloads ~4GB the first time):
-   ```
-   uv run pytest -m heavy
-   ```
-   Expected: 3 passed (STT, translator, pipeline). First run takes 5–15 minutes.
-
-2. **GUI manual verification**:
-   ```
-   uv run mma-sub
-   ```
-   - Window opens with two tabs (영상 처리 / 용어집).
-   - Glossary tab: import `tests/fixtures/glossary.csv` → 4 rows shown. Double-click toggles status.
-   - Video tab: drag `tests/fixtures/sample_speech.mp4` → progress bar advances through stages.
-   - Output `sample_speech.ko.srt` and `sample_speech.subbed.mkv` produced beside the input.
-   - Open `.mkv` in VLC: subtitle track present and selectable, "가드 패스" appears in Korean text.
-
-3. **Tag release** once verified:
-   ```
-   git tag -a v0.1.0 -m "MVP: video → Korean subtitles with manual glossary"
-   ```
-
-## Known limitations (deferred to later versions)
-- No PDF auto-extraction (v0.2)
-- No subtitle preview/edit GUI (v0.3)
-- No job queue / history view (v0.3)
-- No `.app` packaging (v1.0)
+## License
+MIT (see LICENSE)

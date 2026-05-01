@@ -1,8 +1,8 @@
 import shutil
 from pathlib import Path
 import pytest
-from mma_sub.core.audio import extract_wav
-from mma_sub.core.stt import transcribe
+from lexisub.core.audio import extract_wav
+from lexisub.core.stt import transcribe
 
 FIXTURE = Path(__file__).parent.parent / "fixtures" / "sample_speech.mp4"
 

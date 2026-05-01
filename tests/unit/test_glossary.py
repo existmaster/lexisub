@@ -1,7 +1,7 @@
 from pathlib import Path
 import pytest
-from mma_sub.db import repository
-from mma_sub.core import glossary
+from lexisub.db import repository
+from lexisub.core import glossary
 
 FIXTURE = Path(__file__).parent.parent / "fixtures" / "glossary.csv"
 

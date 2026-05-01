@@ -1,9 +1,9 @@
 from __future__ import annotations
 from PySide6.QtWidgets import QMainWindow, QTabWidget
-from mma_sub.gui.video_tab import VideoTab
-from mma_sub.gui.glossary_tab import GlossaryTab
-from mma_sub import config
-from mma_sub.db import repository
+from lexisub.gui.video_tab import VideoTab
+from lexisub.gui.glossary_tab import GlossaryTab
+from lexisub import config
+from lexisub.db import repository
 
 
 class MainWindow(QMainWindow):

@@ -264,6 +264,38 @@ wheels = [
 ]
 
 [[package]]
+name = "lexisub"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "loguru" },
+    { name = "mlx-lm" },
+    { name = "mlx-whisper" },
+    { name = "platformdirs" },
+    { name = "pyside6" },
+]
+
+[package.optional-dependencies]
+dev = [
+    { name = "pytest" },
+    { name = "pytest-mock" },
+    { name = "pytest-qt" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "loguru", specifier = ">=0.7" },
+    { name = "mlx-lm", specifier = ">=0.20" },
+    { name = "mlx-whisper", specifier = ">=0.4" },
+    { name = "platformdirs", specifier = ">=4.2" },
+    { name = "pyside6", specifier = ">=6.7" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8" },
+    { name = "pytest-mock", marker = "extra == 'dev'", specifier = ">=3.14" },
+    { name = "pytest-qt", marker = "extra == 'dev'", specifier = ">=4.4" },
+]
+provides-extras = ["dev"]
+
+[[package]]
 name = "llvmlite"
 version = "0.47.0"
 source = { registry = "https://pypi.org/simple" }
@@ -389,38 +421,6 @@ dependencies = [
 wheels = [
     { url = "https://files.pythonhosted.org/packages/22/b7/a35232812a2ccfffcb7614ba96a91338551a660a0e9815cee668bf5743f0/mlx_whisper-0.4.3-py3-none-any.whl", hash = "sha256:6b82b6597a994643a3e5496c7bc229a672e5ca308458455bfe276e76ae024489", size = 890544, upload-time = "2025-08-29T14:56:13.815Z" },
 ]
-
-[[package]]
-name = "mma-sub"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "loguru" },
-    { name = "mlx-lm" },
-    { name = "mlx-whisper" },
-    { name = "platformdirs" },
-    { name = "pyside6" },
-]
-
-[package.optional-dependencies]
-dev = [
-    { name = "pytest" },
-    { name = "pytest-mock" },
-    { name = "pytest-qt" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "loguru", specifier = ">=0.7" },
-    { name = "mlx-lm", specifier = ">=0.20" },
-    { name = "mlx-whisper", specifier = ">=0.4" },
-    { name = "platformdirs", specifier = ">=4.2" },
-    { name = "pyside6", specifier = ">=6.7" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8" },
-    { name = "pytest-mock", marker = "extra == 'dev'", specifier = ">=3.14" },
-    { name = "pytest-qt", marker = "extra == 'dev'", specifier = ">=4.4" },
-]
-provides-extras = ["dev"]
 
 [[package]]
 name = "more-itertools"

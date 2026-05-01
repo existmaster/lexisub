@@ -1,7 +1,7 @@
 import sqlite3
 from pathlib import Path
 import pytest
-from mma_sub.db import repository
+from lexisub.db import repository
 
 
 @pytest.fixture

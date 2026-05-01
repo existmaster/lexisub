@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (
     QProgressBar, QFileDialog, QMessageBox,
 )
 from loguru import logger
-from mma_sub.core.pipeline import process_video, PipelineResult
+from lexisub.core.pipeline import process_video, PipelineResult
 
 
 class _Worker(QThread):

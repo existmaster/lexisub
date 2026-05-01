@@ -2,8 +2,8 @@ import pytest
 pytest.importorskip("PySide6")
 
 from PySide6.QtWidgets import QPushButton, QProgressBar, QLabel
-from mma_sub.gui.video_tab import VideoTab
-from mma_sub.db import repository
+from lexisub.gui.video_tab import VideoTab
+from lexisub.db import repository
 
 
 def test_video_tab_widgets_present(qtbot, tmp_path):

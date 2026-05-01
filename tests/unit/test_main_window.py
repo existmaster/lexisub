@@ -2,7 +2,7 @@ import pytest
 pytest.importorskip("PySide6")
 
 from PySide6.QtWidgets import QTabWidget
-from mma_sub.gui.main_window import MainWindow
+from lexisub.gui.main_window import MainWindow
 
 
 def test_main_window_has_two_tabs(qtbot):

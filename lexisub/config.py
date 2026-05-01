@@ -1,11 +1,11 @@
 from pathlib import Path
 from platformdirs import user_data_dir
 
-APP_NAME = "MMASubtitle"
+APP_NAME = "Lexisub"
 APP_DATA_DIR = Path(user_data_dir(APP_NAME, appauthor=False))
 APP_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-DB_PATH = APP_DATA_DIR / "mma_sub.sqlite3"
+DB_PATH = APP_DATA_DIR / "lexisub.sqlite3"
 MODELS_DIR = APP_DATA_DIR / "models"
 LOG_DIR = APP_DATA_DIR / "logs"
 TEMP_DIR = APP_DATA_DIR / "tmp"

@@ -2,7 +2,7 @@ import shutil
 import subprocess
 from pathlib import Path
 import pytest
-from mma_sub.core.audio import extract_wav
+from lexisub.core.audio import extract_wav
 
 FIXTURE = Path(__file__).parent.parent / "fixtures" / "sample_30s.mp4"
 

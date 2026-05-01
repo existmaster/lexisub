@@ -1,7 +1,7 @@
 [project]
-name = "mma-sub"
+name = "lexisub"
 version = "0.1.0"
-description = "Local MMA video subtitle tool with PDF-driven glossary"
+description = "Local desktop app: video subtitles in Korean with custom glossary support"
 requires-python = ">=3.12,<3.13"
 dependencies = [
   "PySide6>=6.7",
@@ -19,14 +19,14 @@ dev = [
 ]
 
 [project.scripts]
-mma-sub = "mma_sub.main:main"
+lexisub = "lexisub.main:main"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["mma_sub"]
+packages = ["lexisub"]
 
 [tool.pytest.ini_options]
 markers = [
@@ -35,4 +35,4 @@ markers = [
 addopts = "-ra -m 'not heavy'"
 
 [tool.hatch.build.targets.wheel.force-include]
-"mma_sub/db/schema.sql" = "mma_sub/db/schema.sql"
+"lexisub/db/schema.sql" = "lexisub/db/schema.sql"

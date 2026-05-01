@@ -2,9 +2,9 @@ import pytest
 pytest.importorskip("PySide6")
 
 from PySide6.QtWidgets import QPushButton, QTableWidget
-from mma_sub.gui.glossary_tab import GlossaryTab
-from mma_sub.db import repository
-from mma_sub.core import glossary
+from lexisub.gui.glossary_tab import GlossaryTab
+from lexisub.db import repository
+from lexisub.core import glossary
 from pathlib import Path
 
 FIXTURE = Path(__file__).parent.parent / "fixtures" / "glossary.csv"

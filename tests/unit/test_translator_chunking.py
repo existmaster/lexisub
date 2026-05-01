@@ -1,5 +1,5 @@
-from mma_sub.core.subtitle import Cue
-from mma_sub.core.translator import chunk_cues, format_chunk_for_llm, parse_llm_response, reassemble
+from lexisub.core.subtitle import Cue
+from lexisub.core.translator import chunk_cues, format_chunk_for_llm, parse_llm_response, reassemble
 
 
 def make_cues(n: int) -> list[Cue]:

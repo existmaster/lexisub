@@ -4,8 +4,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 from loguru import logger
-from mma_sub import config
-from mma_sub.core import audio, stt, translator, muxer, glossary, subtitle
+from lexisub import config
+from lexisub.core import audio, stt, translator, muxer, glossary, subtitle
 
 
 ProgressFn = Callable[[str, float], None]

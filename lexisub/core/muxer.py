@@ -2,7 +2,7 @@ from __future__ import annotations
 import shutil
 import subprocess
 from pathlib import Path
-from mma_sub.core.audio import FfmpegMissingError
+from lexisub.core.audio import FfmpegMissingError
 
 
 def _require_ffmpeg() -> None:

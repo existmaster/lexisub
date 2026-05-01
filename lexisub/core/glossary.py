@@ -1,7 +1,7 @@
 from __future__ import annotations
 import csv
 from pathlib import Path
-from mma_sub.db import repository
+from lexisub.db import repository
 
 
 def import_csv(db_path: Path, csv_path: Path, default_status: str = "approved") -> int:

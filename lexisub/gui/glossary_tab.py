@@ -5,8 +5,8 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget,
     QTableWidgetItem, QFileDialog, QMessageBox, QLabel,
 )
-from mma_sub.core import glossary
-from mma_sub.db import repository
+from lexisub.core import glossary
+from lexisub.db import repository
 
 
 class GlossaryTab(QWidget):

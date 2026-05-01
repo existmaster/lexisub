@@ -1,7 +1,7 @@
 from __future__ import annotations
 import sys
 from PySide6.QtWidgets import QApplication
-from mma_sub.gui.main_window import MainWindow
+from lexisub.gui.main_window import MainWindow
 
 
 def main() -> int:

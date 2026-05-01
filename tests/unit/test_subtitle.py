@@ -1,4 +1,4 @@
-from mma_sub.core.subtitle import Cue, parse_srt, serialize_srt
+from lexisub.core.subtitle import Cue, parse_srt, serialize_srt
 
 SAMPLE = """1
 00:00:01,000 --> 00:00:03,500

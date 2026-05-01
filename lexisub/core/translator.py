@@ -2,7 +2,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from typing import Iterator
-from mma_sub.core.subtitle import Cue
+from lexisub.core.subtitle import Cue
 
 
 @dataclass(frozen=True)
@@ -70,7 +70,7 @@ def reassemble(originals: list[Cue], translated_texts: list[str]) -> list[Cue]:
     ]
 
 
-from mma_sub import config
+from lexisub import config
 
 
 def _generate(prompt: str, system: str, max_tokens: int = 1024) -> str:
