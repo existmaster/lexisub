@@ -42,6 +42,23 @@ uv run lexisub
 - Approved terms are injected into the translator's system prompt — they will be used as-is in the output.
 - Example: `tests/fixtures/glossary.csv` has 4 MMA grappling terms.
 
+## Glossary workflow
+
+You have two ways to populate the glossary:
+
+### A. Auto-extract from PDFs (recommended)
+1. **PDF 라이브러리** tab → [PDF 추가] → select one or more PDFs (textbooks, course notes, etc.)
+2. The app extracts text via PyMuPDF and asks the local Gemma 3 model to identify domain terms, generating Korean translations.
+3. New terms land in the **용어집** tab with status `pending`.
+4. Review and approve them (double-click toggles approved ↔ pending).
+5. Approved terms are forced verbatim during video translation.
+
+### B. CSV import (for existing glossaries)
+- 용어집 tab → [CSV 가져오기] → select a CSV with columns
+  `source_lang, source_term, ko_term, category`.
+- Imported terms land as `approved` by default.
+- Examples in `demos/glossaries/`.
+
 ## Tests
 ```
 uv run pytest                       # quick (35 tests, skips heavy)
@@ -58,7 +75,7 @@ uv run pytest -m heavy              # 3 model-download tests (~4GB, slow)
 ## Known limitations
 - Korean output only (other target languages are roadmap)
 - No GUI for editing subtitles before mux (next milestone)
-- No PDF auto-extraction of glossaries yet (next milestone)
+- Not packaged signed (`.app` is unsigned — quarantine workaround documented above)
 
 ## Build a standalone .app from source (advanced)
 
