@@ -1,4 +1,3 @@
-from pathlib import Path
 from mma_sub import config
 
 
