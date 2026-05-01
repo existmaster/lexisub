@@ -40,7 +40,26 @@ uv run pytest -m heavy              # 3 model-download tests (~4GB, slow)
 - Korean output only (other target languages are roadmap)
 - No GUI for editing subtitles before mux (next milestone)
 - No PDF auto-extraction of glossaries yet (next milestone)
-- Not packaged as `.app` yet — runs via `uv run lexisub`
+
+## Build a standalone .app (advanced)
+
+For redistributing to non-developers (no Python/uv required on their Mac):
+
+```
+uv sync --all-extras       # ensure pyinstaller is installed
+./scripts/build_app.sh
+# Output: dist/Lexisub.app  (~400-600MB, unsigned)
+```
+
+To run on another Apple Silicon Mac:
+```
+xattr -dr com.apple.quarantine /path/to/Lexisub.app
+open /path/to/Lexisub.app
+```
+
+The .app does NOT bundle the ~4GB ML models — they download on first run to `~/.cache/huggingface/`.
+
+The .app is unsigned. macOS Gatekeeper will warn on first launch; either right-click → Open, or run the `xattr` command above to remove the quarantine attribute.
 
 ## License
 
