@@ -12,6 +12,7 @@ dependencies = [
   "mlx-lm>=0.20",
   "loguru>=0.7",
   "platformdirs>=4.2",
+  "pymupdf>=1.24",
 ]
 
 [project.optional-dependencies]
