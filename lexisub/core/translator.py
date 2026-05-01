@@ -95,30 +95,53 @@ def translate(
     chunk_size: int = config.TRANSLATION_CHUNK_LINES,
     context: int = config.TRANSLATION_CONTEXT_LINES,
 ) -> list[Cue]:
-    """Translate a full list of cues, preserving timestamps exactly."""
+    """Translate a full list of cues, preserving timestamps exactly.
+
+    On unrecoverable per-chunk failure (3 attempts exhausted), the source
+    text for that chunk is kept verbatim instead of crashing — partial
+    output is more useful than none.
+    """
+    from loguru import logger
+
     translated_texts: list[str] = []
-    for chunk in chunk_cues(cues, size=chunk_size, context=context):
+    for chunk_idx, chunk in enumerate(chunk_cues(cues, size=chunk_size, context=context)):
         prompt = format_chunk_for_llm(chunk)
         n = len(chunk.main)
-        max_tokens = min(2048, max(256, n * 64))
+        max_tokens = min(4096, max(512, n * 96))
         attempts = 0
         last_err: Exception | None = None
+        retry_hint = ""
+        success = False
         while attempts < 3:
             attempts += 1
             try:
                 response = _generate(
-                    prompt + "\n\n[translate-these] 블록의 번호 매겨진 줄만 한국어로 번역해 같은 형식으로 출력하세요.",
+                    prompt
+                    + retry_hint
+                    + f"\n\n[translate-these] 블록의 번호 매겨진 줄을 한국어로 번역하세요. "
+                    f"반드시 1번부터 {n}번까지 모든 줄을 동일한 `<번호>: <번역>` 형식으로 출력해야 합니다. "
+                    f"줄을 빠뜨리지 말고, 번역할 내용이 없는 줄도 원문 그대로 출력하세요.",
                     system=system_prompt,
                     max_tokens=max_tokens,
                 )
                 texts = parse_llm_response(response, expected=n)
                 _validate_lengths(chunk.main, texts)
                 translated_texts.extend(texts)
+                success = True
                 break
             except (ValueError, RuntimeError) as e:
                 last_err = e
-        else:
-            raise RuntimeError(f"translation failed after 3 attempts: {last_err}")
+                retry_hint = (
+                    f"\n\n[중요·재시도] 직전 출력이 잘못되었습니다 ({e}). "
+                    f"반드시 1번부터 {n}번까지 모두, 누락 없이, "
+                    f"`<번호>: <한국어 번역>` 형식 한 줄씩 출력하세요."
+                )
+        if not success:
+            logger.warning(
+                f"chunk {chunk_idx} ({n} cues) failed after 3 attempts: {last_err}; "
+                f"falling back to source text verbatim"
+            )
+            translated_texts.extend(c.text for c in chunk.main)
     return reassemble(cues, translated_texts)
 
 

@@ -15,7 +15,7 @@ for _d in (MODELS_DIR, LOG_DIR, TEMP_DIR):
 STT_MODEL_ID = "mlx-community/whisper-large-v3-turbo"
 LLM_MODEL_ID = "mlx-community/gemma-3-4b-it-4bit"
 
-TRANSLATION_CHUNK_LINES = 25
+TRANSLATION_CHUNK_LINES = 12
 TRANSLATION_CONTEXT_LINES = 3
 TRANSLATION_MAX_LENGTH_RATIO = 1.5
 
