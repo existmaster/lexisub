@@ -71,3 +71,86 @@ def set_term_status(path: Path, term_id: int, status: str) -> None:
             (status, term_id),
         )
         conn.commit()
+
+
+def upsert_pdf(
+    path: Path,
+    file_path: str,
+    title: str | None = None,
+    language: str | None = None,
+    page_count: int | None = None,
+) -> int:
+    with connect(path) as conn:
+        cur = conn.execute(
+            """
+            INSERT INTO pdfs (path, title, language, page_count)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(path) DO UPDATE SET
+                title=excluded.title,
+                language=excluded.language,
+                page_count=excluded.page_count
+            RETURNING id
+            """,
+            (file_path, title, language, page_count),
+        )
+        return cur.fetchone()[0]
+
+
+def list_pdfs(path: Path) -> list[sqlite3.Row]:
+    with connect(path) as conn:
+        return list(conn.execute(
+            "SELECT * FROM pdfs ORDER BY added_at DESC"
+        ).fetchall())
+
+
+def get_pdf(path: Path, pdf_id: int) -> sqlite3.Row | None:
+    with connect(path) as conn:
+        return conn.execute(
+            "SELECT * FROM pdfs WHERE id = ?", (pdf_id,)
+        ).fetchone()
+
+
+def set_pdf_extraction_status(
+    path: Path, pdf_id: int, status: str, extracted_at_now: bool = False
+) -> None:
+    sql = "UPDATE pdfs SET extraction_status = ?"
+    args: tuple = (status,)
+    if extracted_at_now:
+        sql += ", extracted_at = CURRENT_TIMESTAMP"
+    sql += " WHERE id = ?"
+    args = args + (pdf_id,)
+    with connect(path) as conn:
+        conn.execute(sql, args)
+        conn.commit()
+
+
+def add_term_source(
+    path: Path,
+    term_id: int,
+    pdf_id: int,
+    page_no: int | None,
+    context: str | None,
+) -> None:
+    with connect(path) as conn:
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO term_sources (term_id, pdf_id, page_no, context)
+            VALUES (?, ?, ?, ?)
+            """,
+            (term_id, pdf_id, page_no, context),
+        )
+        conn.commit()
+
+
+def list_sources_for_term(path: Path, term_id: int) -> list[sqlite3.Row]:
+    with connect(path) as conn:
+        return list(conn.execute(
+            """
+            SELECT ts.*, p.title AS pdf_title, p.path AS pdf_path
+            FROM term_sources ts
+            JOIN pdfs p ON p.id = ts.pdf_id
+            WHERE ts.term_id = ?
+            ORDER BY ts.page_no
+            """,
+            (term_id,),
+        ).fetchall())
