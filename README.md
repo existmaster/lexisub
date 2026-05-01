@@ -6,7 +6,26 @@ Built and tested for MMA training videos initially (the trainer 독진수's use 
 
 Apple Silicon Mac only. Runs entirely locally; no cloud API calls.
 
-## Setup
+## Install (recommended for end users)
+
+Download the latest pre-built `.app` zip from [Releases](https://github.com/existmaster/lexisub/releases/latest), then:
+
+```bash
+unzip Lexisub-v*-macos-arm64.zip
+xattr -dr com.apple.quarantine Lexisub.app
+open Lexisub.app
+```
+
+The `.app` is unsigned (no Apple Developer signature). macOS will warn on first launch — use the `xattr` command above, or right-click the app and choose **Open** the first time.
+
+You also need `ffmpeg`:
+```bash
+brew install ffmpeg
+```
+
+On first run, the app downloads ~4GB of ML models (Whisper + Gemma 3 4B) to `~/.cache/huggingface/`. Subsequent launches are instant.
+
+## Run from source (developers)
 ```
 uv sync
 uv run lexisub
@@ -41,25 +60,24 @@ uv run pytest -m heavy              # 3 model-download tests (~4GB, slow)
 - No GUI for editing subtitles before mux (next milestone)
 - No PDF auto-extraction of glossaries yet (next milestone)
 
-## Build a standalone .app (advanced)
+## Build a standalone .app from source (advanced)
 
-For redistributing to non-developers (no Python/uv required on their Mac):
+You normally don't need this — pre-built zips are on the [Releases](https://github.com/existmaster/lexisub/releases) page, auto-built by GitHub Actions on every tag push (see `.github/workflows/build-app.yml`).
 
+If you do want to build locally:
 ```
-uv sync --all-extras       # ensure pyinstaller is installed
+uv sync --all-extras
 ./scripts/build_app.sh
-# Output: dist/Lexisub.app  (~400-600MB, unsigned)
+# Output: dist/Lexisub.app  (~800MB, unsigned)
 ```
 
-To run on another Apple Silicon Mac:
+To cut a new release (which auto-publishes a `.app` zip):
 ```
-xattr -dr com.apple.quarantine /path/to/Lexisub.app
-open /path/to/Lexisub.app
+git tag -a v0.X.Y -m "release notes"
+git push origin v0.X.Y
+# Watch the build:  gh run watch
+# Once green, the zip appears on the release page automatically.
 ```
-
-The .app does NOT bundle the ~4GB ML models — they download on first run to `~/.cache/huggingface/`.
-
-The .app is unsigned. macOS Gatekeeper will warn on first launch; either right-click → Open, or run the `xattr` command above to remove the quarantine attribute.
 
 ## License
 
