@@ -17,6 +17,13 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Apple Vision OCR (only used by scripts/ocr_pdf.py for now). Excluded from
+# the default .app bundle to save ~60MB. Install with `uv sync --extra ocr`
+# if you want to OCR scanned PDFs from the CLI.
+ocr = [
+  "ocrmac>=1.0.1",
+  "Pillow>=10",
+]
 dev = [
   "pytest>=8",
   "pytest-qt>=4.4",

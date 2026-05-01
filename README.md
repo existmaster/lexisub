@@ -54,11 +54,28 @@ You have two ways to populate the glossary:
 - Imported terms land as `approved` by default.
 - Examples in `demos/glossaries/`.
 
+## Managing the library
+
+- **PDF 라이브러리** tab: select one or more PDFs and click [선택 제거]. Choose whether to also prune the auto-extracted *pending* terms whose only source was the removed PDF (your manually approved CSV terms are never touched).
+- **용어집** tab: select rows and press <kbd>Delete</kbd> (or click [선택 삭제]) to remove specific terms. [출처 없는 보류 정리] sweeps any auto-extracted pending term that lost all its PDF sources.
+
 ## Tests
 ```
-uv run pytest                       # quick (44 tests, skips heavy)
+uv run pytest                       # quick (52 tests, skips heavy)
 uv run pytest -m heavy              # 4 model-download tests (~4GB, slow)
 ```
+
+## Optional: OCR for scanned PDFs
+
+The default install does NOT include OCR (saves ~60MB on the .app bundle). If your PDFs are scans without a text layer, install the `ocr` extra:
+
+```bash
+uv sync --extra ocr
+uv run python scripts/ocr_pdf.py "<scanned.pdf>"
+# Produces <scanned>.ocr.pdf with a text layer; feed that into Lexisub.
+```
+
+This uses Apple Vision OCR (macOS native, free, ~2.5 pages/sec). Korean accuracy is excellent. The resulting `*.ocr.pdf` is what you import into the **PDF 라이브러리** tab.
 
 ## Requirements
 - Apple Silicon Mac (M1/M2/M3/M4)
@@ -78,9 +95,9 @@ You normally don't need this — pre-built zips are on the [Releases](https://gi
 
 If you do want to build locally:
 ```
-uv sync --all-extras
+uv sync --extra dev      # NOT --all-extras — keeps `ocr` out of the bundle
 ./scripts/build_app.sh
-# Output: dist/Lexisub.app  (~800MB, unsigned)
+# Output: dist/Lexisub.app  (~600-700MB, unsigned)
 ```
 
 To cut a new release (which auto-publishes a `.app` zip):

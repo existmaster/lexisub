@@ -25,7 +25,37 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['tkinter', 'matplotlib', 'IPython'],
+    excludes=[
+        # GUI alternatives we don't use
+        'tkinter', 'matplotlib', 'IPython',
+        # OCR is an optional install via [project.optional-dependencies] ocr.
+        # When present in the build env, exclude from the .app bundle to keep
+        # the distribution slim. (Saves ~60MB on macOS arm64.)
+        'ocrmac', 'PIL',
+        'objc', 'Foundation', 'AppKit', 'Quartz', 'Vision', 'CoreML',
+        'pyobjc_framework_Cocoa', 'pyobjc_framework_Vision',
+        'pyobjc_framework_CoreML', 'pyobjc_framework_Quartz',
+        # ML frameworks not used at runtime (huggingface_hub touches them
+        # via ctypes lookups that PyInstaller scans). These are NOT installed
+        # but we exclude defensively to silence warnings and avoid stale
+        # imports finding system-wide installs.
+        'tensorflow', 'tensorflow_text', 'tensorboard',
+        'torch', 'torchvision', 'torchaudio',
+        'jax', 'jaxlib', 'flax', 'optax',
+        # PySide6 modules we don't use — saves ~80MB
+        'PySide6.QtBluetooth', 'PySide6.QtNfc', 'PySide6.QtSensors',
+        'PySide6.QtMultimedia', 'PySide6.QtMultimediaWidgets',
+        'PySide6.QtWebEngineCore', 'PySide6.QtWebEngineWidgets',
+        'PySide6.QtWebChannel', 'PySide6.QtWebSockets',
+        'PySide6.QtCharts', 'PySide6.QtDataVisualization',
+        'PySide6.QtPositioning', 'PySide6.QtLocation',
+        'PySide6.QtSerialPort', 'PySide6.QtSerialBus',
+        'PySide6.QtQml', 'PySide6.QtQuick', 'PySide6.QtQuickWidgets',
+        'PySide6.Qt3DCore', 'PySide6.Qt3DRender',
+        'PySide6.QtSql', 'PySide6.QtTest', 'PySide6.QtPdf',
+        'PySide6.QtPdfWidgets', 'PySide6.QtRemoteObjects',
+        'PySide6.QtScxml', 'PySide6.QtStateMachine', 'PySide6.QtSpatialAudio',
+    ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,

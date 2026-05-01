@@ -11,9 +11,12 @@ class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("Lexisub")
-        self.resize(1000, 650)
+        self.resize(1080, 720)
+        self.setMinimumSize(880, 560)
         repository.init_db(config.DB_PATH)
         tabs = QTabWidget()
+        tabs.setDocumentMode(True)
+        tabs.setMovable(False)
 
         self.glossary_tab = GlossaryTab(config.DB_PATH)
         self.pdf_tab = PdfTab(

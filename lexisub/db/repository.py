@@ -154,3 +154,54 @@ def list_sources_for_term(path: Path, term_id: int) -> list[sqlite3.Row]:
             """,
             (term_id,),
         ).fetchall())
+
+
+def delete_term(path: Path, term_id: int) -> None:
+    """Delete a single term. term_sources rows for it cascade-delete."""
+    with connect(path) as conn:
+        conn.execute("DELETE FROM terms WHERE id = ?", (term_id,))
+        conn.commit()
+
+
+def delete_terms(path: Path, term_ids: list[int]) -> int:
+    """Delete multiple terms. Returns rows affected."""
+    if not term_ids:
+        return 0
+    with connect(path) as conn:
+        placeholders = ",".join("?" for _ in term_ids)
+        cur = conn.execute(
+            f"DELETE FROM terms WHERE id IN ({placeholders})", term_ids
+        )
+        conn.commit()
+        return cur.rowcount
+
+
+def delete_pdf(path: Path, pdf_id: int) -> None:
+    """Delete a PDF record. term_sources cascade-delete; terms themselves
+    are kept (they may have other PDF sources).
+    """
+    with connect(path) as conn:
+        conn.execute("DELETE FROM pdfs WHERE id = ?", (pdf_id,))
+        conn.commit()
+
+
+def prune_orphan_terms(path: Path) -> int:
+    """Delete `pending` terms that have no remaining term_sources rows.
+
+    Used after a PDF deletion to clean up auto-extracted terms whose
+    only source PDFs have been removed. CSV-imported terms (which arrive
+    without term_sources rows) default to status='approved' and are not
+    touched by this query, so manual glossary entries are safe.
+
+    Returns number of terms deleted.
+    """
+    with connect(path) as conn:
+        cur = conn.execute(
+            """
+            DELETE FROM terms
+            WHERE status = 'pending'
+              AND id NOT IN (SELECT term_id FROM term_sources)
+            """
+        )
+        conn.commit()
+        return cur.rowcount
