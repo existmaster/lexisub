@@ -10,7 +10,7 @@ from lexisub.db import repository
 
 
 class GlossaryTab(QWidget):
-    COLUMNS = ["언어", "원어 용어", "한국어 번역", "분류", "상태"]
+    COLUMNS = ["언어", "원어 용어", "한국어 번역", "분류", "상태", "출처"]
 
     def __init__(self, db_path: Path) -> None:
         super().__init__()
@@ -47,10 +47,15 @@ class GlossaryTab(QWidget):
         rows = repository.list_terms(self.db_path)
         self.table.setRowCount(len(rows))
         for r, term in enumerate(rows):
+            sources = repository.list_sources_for_term(self.db_path, term["id"])
+            src_label = ", ".join(
+                f"{s['pdf_title'] or Path(s['pdf_path']).name}:p{s['page_no']}"
+                for s in sources
+            ) if sources else "—"
             cells = [
                 term["source_lang"], term["source_term"],
                 term["ko_term"], term["category"] or "",
-                term["status"],
+                term["status"], src_label,
             ]
             for c, val in enumerate(cells):
                 item = QTableWidgetItem(str(val))
