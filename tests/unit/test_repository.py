@@ -23,3 +23,31 @@ def test_init_creates_terms_table(tmp_db: Path):
 def test_init_is_idempotent(tmp_db: Path):
     repository.init_db(tmp_db)
     repository.init_db(tmp_db)
+
+
+def test_insert_and_list_terms(tmp_db: Path):
+    repository.upsert_term(tmp_db, "en", "guard pass", "가드 패스", "기술", "approved")
+    repository.upsert_term(tmp_db, "en", "armbar", "암바", "기술", "pending")
+    terms = repository.list_terms(tmp_db)
+    assert len(terms) == 2
+
+
+def test_list_approved_only(tmp_db: Path):
+    repository.upsert_term(tmp_db, "en", "guard pass", "가드 패스", "기술", "approved")
+    repository.upsert_term(tmp_db, "en", "armbar", "암바", "기술", "pending")
+    approved = repository.list_terms(tmp_db, status="approved")
+    assert len(approved) == 1
+    assert approved[0]["source_term"] == "guard pass"
+
+
+def test_upsert_idempotent_on_duplicate(tmp_db: Path):
+    repository.upsert_term(tmp_db, "en", "guard pass", "가드 패스", "기술", "approved")
+    repository.upsert_term(tmp_db, "en", "guard pass", "가드 패스", "기술", "approved")
+    assert len(repository.list_terms(tmp_db)) == 1
+
+
+def test_set_term_status(tmp_db: Path):
+    tid = repository.upsert_term(tmp_db, "en", "armbar", "암바", "기술", "pending")
+    repository.set_term_status(tmp_db, tid, "approved")
+    term = repository.get_term(tmp_db, tid)
+    assert term["status"] == "approved"
