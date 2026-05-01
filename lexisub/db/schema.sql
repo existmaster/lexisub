@@ -45,3 +45,34 @@ CREATE TABLE IF NOT EXISTS jobs (
   completed_at TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
+
+-- v0.3+: knowledge-base infrastructure for future RAG. Embedding columns
+-- stay NULL until v0.4 wires up sentence-transformers / mlx-embeddings.
+
+CREATE TABLE IF NOT EXISTS pdf_chunks (
+  id INTEGER PRIMARY KEY,
+  pdf_id INTEGER NOT NULL REFERENCES pdfs(id) ON DELETE CASCADE,
+  page_no INTEGER,
+  chunk_index INTEGER NOT NULL,
+  text TEXT NOT NULL,
+  char_count INTEGER,
+  embedding BLOB,
+  embed_model TEXT,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(pdf_id, chunk_index)
+);
+CREATE INDEX IF NOT EXISTS idx_chunks_pdf ON pdf_chunks(pdf_id);
+
+CREATE TABLE IF NOT EXISTS translation_pairs (
+  id INTEGER PRIMARY KEY,
+  pdf_id INTEGER REFERENCES pdfs(id) ON DELETE CASCADE,
+  page_no INTEGER,
+  source_lang TEXT NOT NULL,
+  source_text TEXT NOT NULL,
+  ko_text TEXT NOT NULL,
+  embedding BLOB,
+  embed_model TEXT,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(pdf_id, source_text, ko_text)
+);
+CREATE INDEX IF NOT EXISTS idx_pairs_pdf ON translation_pairs(pdf_id);

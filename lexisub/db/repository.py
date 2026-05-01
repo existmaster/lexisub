@@ -10,10 +10,20 @@ def _read_schema() -> str:
     )
 
 
+def _add_column_if_missing(
+    conn: sqlite3.Connection, table: str, column: str, type_: str
+) -> None:
+    cols = {row[1] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+    if column not in cols:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {type_}")
+
+
 def init_db(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(path) as conn:
         conn.executescript(_read_schema())
+        # Idempotent migrations for older DBs created by v0.1/v0.2.
+        _add_column_if_missing(conn, "terms", "definition", "TEXT")
         conn.commit()
 
 
@@ -31,19 +41,21 @@ def upsert_term(
     ko_term: str,
     category: str | None,
     status: str = "pending",
+    definition: str | None = None,
 ) -> int:
     with connect(path) as conn:
         cur = conn.execute(
             """
-            INSERT INTO terms (source_lang, source_term, ko_term, category, status)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO terms (source_lang, source_term, ko_term, category, status, definition)
+            VALUES (?, ?, ?, ?, ?, ?)
             ON CONFLICT(source_lang, source_term, ko_term)
             DO UPDATE SET category=excluded.category,
                           status=excluded.status,
+                          definition=COALESCE(excluded.definition, terms.definition),
                           updated_at=CURRENT_TIMESTAMP
             RETURNING id
             """,
-            (source_lang, source_term, ko_term, category, status),
+            (source_lang, source_term, ko_term, category, status, definition),
         )
         return cur.fetchone()[0]
 
@@ -71,6 +83,33 @@ def set_term_status(path: Path, term_id: int, status: str) -> None:
             (status, term_id),
         )
         conn.commit()
+
+
+def set_terms_status(path: Path, term_ids: list[int], status: str) -> int:
+    """Bulk update status for multiple term IDs. Returns rows affected."""
+    if not term_ids:
+        return 0
+    with connect(path) as conn:
+        placeholders = ",".join("?" for _ in term_ids)
+        cur = conn.execute(
+            f"UPDATE terms SET status = ?, updated_at = CURRENT_TIMESTAMP "
+            f"WHERE id IN ({placeholders})",
+            (status, *term_ids),
+        )
+        conn.commit()
+        return cur.rowcount
+
+
+def set_all_pending_to(path: Path, status: str) -> int:
+    """Promote/demote every pending term in one shot. Returns rows affected."""
+    with connect(path) as conn:
+        cur = conn.execute(
+            "UPDATE terms SET status = ?, updated_at = CURRENT_TIMESTAMP "
+            "WHERE status = 'pending'",
+            (status,),
+        )
+        conn.commit()
+        return cur.rowcount
 
 
 def upsert_pdf(
@@ -183,6 +222,95 @@ def delete_pdf(path: Path, pdf_id: int) -> None:
     with connect(path) as conn:
         conn.execute("DELETE FROM pdfs WHERE id = ?", (pdf_id,))
         conn.commit()
+
+
+def add_pdf_chunk(
+    path: Path,
+    pdf_id: int,
+    chunk_index: int,
+    text: str,
+    page_no: int | None = None,
+) -> None:
+    """Store a raw text chunk from a PDF.
+
+    Embedding columns (`embedding`, `embed_model`) stay NULL — v0.4 RAG
+    will populate them. INSERT OR IGNORE keeps re-extraction idempotent
+    when the same (pdf_id, chunk_index) is upserted.
+    """
+    with connect(path) as conn:
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO pdf_chunks
+              (pdf_id, chunk_index, text, char_count, page_no)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (pdf_id, chunk_index, text, len(text), page_no),
+        )
+        conn.commit()
+
+
+def list_chunks_for_pdf(path: Path, pdf_id: int) -> list[sqlite3.Row]:
+    with connect(path) as conn:
+        return list(conn.execute(
+            "SELECT * FROM pdf_chunks WHERE pdf_id = ? ORDER BY chunk_index",
+            (pdf_id,),
+        ).fetchall())
+
+
+def count_chunks(path: Path, pdf_id: int | None = None) -> int:
+    with connect(path) as conn:
+        if pdf_id is None:
+            return conn.execute(
+                "SELECT COUNT(*) FROM pdf_chunks"
+            ).fetchone()[0]
+        return conn.execute(
+            "SELECT COUNT(*) FROM pdf_chunks WHERE pdf_id = ?", (pdf_id,)
+        ).fetchone()[0]
+
+
+def add_translation_pair(
+    path: Path,
+    pdf_id: int | None,
+    source_lang: str,
+    source_text: str,
+    ko_text: str,
+    page_no: int | None = None,
+) -> None:
+    with connect(path) as conn:
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO translation_pairs
+              (pdf_id, page_no, source_lang, source_text, ko_text)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (pdf_id, page_no, source_lang, source_text, ko_text),
+        )
+        conn.commit()
+
+
+def list_translation_pairs(
+    path: Path, pdf_id: int | None = None
+) -> list[sqlite3.Row]:
+    with connect(path) as conn:
+        if pdf_id is None:
+            return list(conn.execute(
+                "SELECT * FROM translation_pairs ORDER BY id DESC"
+            ).fetchall())
+        return list(conn.execute(
+            "SELECT * FROM translation_pairs WHERE pdf_id = ? ORDER BY page_no",
+            (pdf_id,),
+        ).fetchall())
+
+
+def count_translation_pairs(path: Path, pdf_id: int | None = None) -> int:
+    with connect(path) as conn:
+        if pdf_id is None:
+            return conn.execute(
+                "SELECT COUNT(*) FROM translation_pairs"
+            ).fetchone()[0]
+        return conn.execute(
+            "SELECT COUNT(*) FROM translation_pairs WHERE pdf_id = ?", (pdf_id,)
+        ).fetchone()[0]
 
 
 def prune_orphan_terms(path: Path) -> int:

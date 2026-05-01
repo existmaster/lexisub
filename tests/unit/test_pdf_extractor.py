@@ -86,3 +86,33 @@ def test_parse_terms_rejects_invalid_lang_code():
     )
     terms = _parse_terms(raw, default_source_lang="en")
     assert terms[0].source_lang == "en"
+
+
+def test_parse_terms_carries_definition():
+    raw = (
+        '[{"source_lang": "en", "source_term": "Heel Strike", '
+        '"ko_term": "발꿈치 접지", "category": "기술", '
+        '"context": "보행 사이클의 첫 단계.", '
+        '"definition": "발꿈치가 지면에 처음 닿는 보행 사이클의 시작 지점."}]'
+    )
+    terms = _parse_terms(raw, default_source_lang="en")
+    assert terms[0].definition == "발꿈치가 지면에 처음 닿는 보행 사이클의 시작 지점."
+    assert terms[0].context == "보행 사이클의 첫 단계."
+
+
+def test_parse_terms_definition_empty_string_becomes_none():
+    raw = (
+        '[{"source_lang": "en", "source_term": "X", "ko_term": "엑스", '
+        '"category": "기타", "definition": ""}]'
+    )
+    terms = _parse_terms(raw, default_source_lang="en")
+    assert terms[0].definition is None
+
+
+def test_parse_terms_no_definition_field():
+    raw = (
+        '[{"source_lang": "en", "source_term": "X", "ko_term": "엑스", '
+        '"category": "기타"}]'
+    )
+    terms = _parse_terms(raw, default_source_lang="en")
+    assert terms[0].definition is None

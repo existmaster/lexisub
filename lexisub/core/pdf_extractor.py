@@ -24,6 +24,34 @@ class PdfMetadata:
     page_count: int
 
 
+def _safe_title(meta_title: str | None, path: Path) -> str:
+    """Use the PDF's embedded title only if it decodes cleanly. Many PDFs
+    (especially Korean publishers') store the title with broken encoding,
+    which PyMuPDF surfaces as mojibake like ``ô›X É:p16``. We detect that
+    and fall back to the filename stem.
+    """
+    if not meta_title:
+        return path.stem
+    s = meta_title.strip()
+    if not s:
+        return path.stem
+    # Heuristic: if more than 30% of characters are outside Hangul / ASCII /
+    # common punctuation, the title is likely a decoding artifact.
+    def _ok(c: str) -> bool:
+        return (
+            c.isascii()
+            or "가" <= c <= "힣"  # Hangul syllables
+            or "ㄱ" <= c <= "ㆎ"  # Hangul jamo
+            or "　" <= c <= "〿"  # CJK symbols / punctuation
+            or "一" <= c <= "鿿"  # CJK ideographs (Hanja in some texts)
+            or c in " \t-_·,./()[]"
+        )
+    bad = sum(1 for c in s if not _ok(c))
+    if bad / len(s) > 0.3:
+        return path.stem
+    return s
+
+
 def open_pdf(path: Path) -> tuple[PdfMetadata, list[PdfPage]]:
     """Open a PDF and return its metadata + text per page (1-indexed)."""
     doc = fitz.open(str(path))
@@ -34,7 +62,7 @@ def open_pdf(path: Path) -> tuple[PdfMetadata, list[PdfPage]]:
             for i in range(doc.page_count)
         ]
         meta = PdfMetadata(
-            title=(meta_title or path.stem) or None,
+            title=_safe_title(meta_title, path),
             page_count=doc.page_count,
         )
         return meta, pages
@@ -101,6 +129,7 @@ class ExtractedTerm:
     ko_term: str
     category: str | None
     context: str | None
+    definition: str | None = None
 
 
 def _strip_code_fence(text: str) -> str:
@@ -152,8 +181,10 @@ _SYSTEM_PROMPT = (
     "각 용어에 대해 source_lang 필드에 ISO 639-1 코드(en, ko, pt, ja, fr, es, de, it, ru, zh-cn 등)를 포함하세요.\n"
     "원어가 영어 학술용어면 source_lang='en'이고 ko_term에 한국어 번역을 넣으세요.\n"
     "원어가 한국어 전문용어인데 표준 한국어 표기가 따로 있다면 source_lang='ko'로 두고 ko_term에 표준 표기를 넣으세요.\n"
+    "definition 필드는 본문에서 그 용어가 어떻게 정의/설명되는지 한국어로 1~2 문장 요약을 넣으세요. "
+    "본문에 정의가 명시적으로 등장하지 않으면 빈 문자열로 두세요. 추측하지 마세요.\n"
     "출력은 반드시 다음 JSON 배열 형식입니다:\n"
-    '[{"source_lang": "en|ko|...", "source_term": "...", "ko_term": "...", "category": "기술|해부학|의학|개념|장비|기타", "context": "...간단한 출처 문맥..."}]\n'
+    '[{"source_lang": "en|ko|...", "source_term": "...", "ko_term": "...", "category": "기술|해부학|의학|개념|장비|인명|기타", "context": "...간단한 출처 문맥...", "definition": "...한국어 1~2 문장 정의 또는 빈 문자열..."}]\n'
     "용어가 없으면 빈 배열 []을 출력하세요.\n"
     "다른 설명 없이 JSON만 출력하세요."
 )
@@ -207,6 +238,7 @@ def _parse_terms(raw: str, default_source_lang: str) -> list[ExtractedTerm]:
                 ko_term=kt,
                 category=(item.get("category") or "").strip() or None,
                 context=(item.get("context") or "").strip() or None,
+                definition=(item.get("definition") or "").strip() or None,
             )
         )
     return out
@@ -252,6 +284,16 @@ def extract_terms(
     chunks = chunk_pages(pages, target_chars=3000)
     progress("opening", 1.0)
 
+    # Always store raw chunks for future RAG (LLM-free, fast).
+    for i, (page_nos, text) in enumerate(chunks):
+        repository.add_pdf_chunk(
+            db_path,
+            pdf_id=pdf_id,
+            chunk_index=i,
+            text=text,
+            page_no=page_nos[0] if page_nos else None,
+        )
+
     inserted = 0
     try:
         for i, (page_nos, text) in enumerate(chunks):
@@ -280,6 +322,7 @@ def extract_terms(
                     ko_term=t.ko_term,
                     category=t.category,
                     status="pending",
+                    definition=t.definition,
                 )
                 repository.add_term_source(
                     db_path,
@@ -298,4 +341,92 @@ def extract_terms(
         repository.set_pdf_extraction_status(db_path, pdf_id, "failed")
         raise
     progress("done", 1.0)
+    return inserted
+
+
+_TRANSLATION_PAIRS_PROMPT = (
+    "당신은 텍스트에서 외국어(영어 등) 표현과 그에 대응하는 한국어 번역이 "
+    "나란히 병기된 쌍을 추출하는 도구입니다.\n"
+    "한 문장(또는 명사구)이 외국어와 한국어로 같이 등장하면 source_text와 "
+    "ko_text 쌍으로 묶으세요. 단순한 단어 한 쌍이 아니라 문장/구 단위로.\n"
+    "각 쌍에 source_lang(en/pt/ja 등 ISO 639-1 코드)을 함께 출력하세요.\n"
+    "출력은 반드시 JSON 배열 형식:\n"
+    '[{"source_lang": "en", "source_text": "...", "ko_text": "..."}]\n'
+    "쌍이 없으면 빈 배열 [] 출력. 다른 설명 없이 JSON만."
+)
+
+
+def extract_translation_pairs(
+    pdf_path: Path,
+    db_path: Path,
+    progress: ProgressFn = _noop,
+) -> int:
+    """For PDFs that print foreign-language passages alongside Korean
+    translations (e.g. medical textbooks, the user's 보행의 평가.pdf),
+    extract sentence-level translation pairs.
+
+    Stored in `translation_pairs` for future few-shot translation memory
+    or RAG. Embeddings stay NULL until v0.4 wires them in.
+
+    Returns number of pairs inserted.
+    """
+    pdf_path = pdf_path.resolve()
+    progress("opening", 0.0)
+    meta, pages = open_pdf(pdf_path)
+    pdf_id = repository.upsert_pdf(
+        db_path,
+        file_path=str(pdf_path),
+        title=meta.title,
+        page_count=meta.page_count,
+    )
+    chunks = chunk_pages(pages, target_chars=3000)
+    progress("opening", 1.0)
+
+    inserted = 0
+    for i, (page_nos, text) in enumerate(chunks):
+        progress("pairs", i / max(1, len(chunks)))
+        attempts = 0
+        pairs: list[dict] = []
+        while attempts < 3:
+            attempts += 1
+            try:
+                raw = _generate(
+                    text, system=_TRANSLATION_PAIRS_PROMPT, max_tokens=4096
+                )
+                cleaned = _strip_code_fence(raw)
+                try:
+                    data = json.loads(cleaned)
+                except json.JSONDecodeError:
+                    data = json.loads(_salvage_truncated_array(cleaned))
+                if not isinstance(data, list):
+                    raise ValueError("expected JSON array")
+                pairs = [d for d in data if isinstance(d, dict)]
+                break
+            except (ValueError, json.JSONDecodeError) as e:
+                logger.warning(
+                    f"pair-chunk {i + 1}/{len(chunks)} attempt {attempts} "
+                    f"failed: {e}"
+                )
+        else:
+            continue
+
+        for p in pairs:
+            sl = (p.get("source_lang") or "").strip().lower()
+            if sl not in _ALLOWED_LANGS:
+                continue
+            st = (p.get("source_text") or "").strip()
+            kt = (p.get("ko_text") or "").strip()
+            if not st or not kt or st == kt:
+                continue
+            repository.add_translation_pair(
+                db_path,
+                pdf_id=pdf_id,
+                source_lang=sl,
+                source_text=st,
+                ko_text=kt,
+                page_no=page_nos[0] if page_nos else None,
+            )
+            inserted += 1
+
+    progress("pairs", 1.0)
     return inserted
