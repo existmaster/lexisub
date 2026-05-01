@@ -1,0 +1,76 @@
+name: Build macOS .app
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Attach .zip to this existing release tag (e.g. v0.1.0). Leave empty to upload as workflow artifact only.'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build .app on Apple Silicon
+    runs-on: macos-14
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: 'uv.lock'
+
+      - name: Pin Python 3.12
+        run: uv python install 3.12
+
+      - name: Sync dependencies
+        run: uv sync --all-extras
+
+      - name: Compute release tag
+        id: ver
+        run: |
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          elif [[ -n "${{ inputs.release_tag }}" ]]; then
+            echo "tag=${{ inputs.release_tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=manual-${GITHUB_SHA::8}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build .app via PyInstaller
+        run: ./scripts/build_app.sh
+
+      - name: Compress .app (ditto preserves macOS metadata)
+        id: zip
+        run: |
+          set -euo pipefail
+          cd dist
+          ZIP_NAME="Lexisub-${{ steps.ver.outputs.tag }}-macos-arm64.zip"
+          ditto -c -k --keepParent --sequesterRsrc Lexisub.app "$ZIP_NAME"
+          ls -lh "$ZIP_NAME"
+          echo "zip_path=dist/$ZIP_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Upload as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Lexisub-${{ steps.ver.outputs.tag }}-macos-arm64
+          path: dist/Lexisub-*.zip
+          if-no-files-found: error
+
+      - name: Attach to GitHub Release
+        if: github.event_name == 'push' || inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          files: dist/Lexisub-*.zip
+          fail_on_unmatched_files: true
