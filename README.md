@@ -37,11 +37,6 @@ uv run lexisub
 3. Local Gemma 3 4B (mlx-lm) translates each line to Korean, with your approved glossary terms forced verbatim.
 4. The Korean `.srt` is written next to the video, and an `.mkv` with the subtitle track muxed in is produced (no re-encoding).
 
-## Glossary
-- Import a CSV with columns `source_lang, source_term, ko_term, category` from the 용어집 tab.
-- Approved terms are injected into the translator's system prompt — they will be used as-is in the output.
-- Example: `tests/fixtures/glossary.csv` has 4 MMA grappling terms.
-
 ## Glossary workflow
 
 You have two ways to populate the glossary:
@@ -61,8 +56,8 @@ You have two ways to populate the glossary:
 
 ## Tests
 ```
-uv run pytest                       # quick (35 tests, skips heavy)
-uv run pytest -m heavy              # 3 model-download tests (~4GB, slow)
+uv run pytest                       # quick (44 tests, skips heavy)
+uv run pytest -m heavy              # 4 model-download tests (~4GB, slow)
 ```
 
 ## Requirements
