@@ -20,12 +20,12 @@ class _ExtractWorker(QThread):
         self,
         pdfs: list[Path],
         db_path: Path,
-        source_lang: str,
+        source_lang: str | None,
     ) -> None:
         super().__init__()
         self.pdfs = pdfs
         self.db_path = db_path
-        self.source_lang = source_lang
+        self.source_lang = source_lang  # None → auto-detect per PDF
 
     def run(self) -> None:
         for i, p in enumerate(self.pdfs):
@@ -63,9 +63,11 @@ class PdfTab(QWidget):
 
         self.lang_combo = QComboBox()
         self.lang_combo.setObjectName("source_lang_combo")
-        self.lang_combo.addItems(["en", "pt", "ja", "es", "fr", "de"])
-        self.lang_combo.setCurrentText("en")
-        self.lang_combo.setToolTip("PDF 원본 언어")
+        self.lang_combo.addItems(["자동 감지", "en", "ko", "pt", "ja", "es", "fr", "de", "it", "ru", "zh-cn"])
+        self.lang_combo.setCurrentText("자동 감지")
+        self.lang_combo.setToolTip(
+            "PDF 원본 언어. '자동 감지'를 선택하면 PDF 텍스트로부터 자동으로 판단합니다."
+        )
 
         self.progress = QProgressBar()
         self.progress.setObjectName("pdf_progress")
@@ -118,8 +120,10 @@ class PdfTab(QWidget):
             return
         pdfs = [Path(p) for p in paths]
         self.add_btn.setEnabled(False)
+        choice = self.lang_combo.currentText()
+        lang = None if choice == "자동 감지" else choice
         self.worker = _ExtractWorker(
-            pdfs, self.db_path, source_lang=self.lang_combo.currentText()
+            pdfs, self.db_path, source_lang=lang
         )
         self.worker.progress.connect(self._on_progress)
         self.worker.one_done.connect(self._on_one_done)

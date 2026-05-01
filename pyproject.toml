@@ -13,6 +13,7 @@ dependencies = [
   "loguru>=0.7",
   "platformdirs>=4.2",
   "pymupdf>=1.24",
+  "langdetect>=1.0.9",
 ]
 
 [project.optional-dependencies]

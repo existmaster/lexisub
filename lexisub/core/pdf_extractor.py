@@ -42,6 +42,34 @@ def open_pdf(path: Path) -> tuple[PdfMetadata, list[PdfPage]]:
         doc.close()
 
 
+_ALLOWED_LANGS = {"en", "ko", "ja", "zh-cn", "zh-tw", "es", "fr", "de", "pt", "it", "ru"}
+
+
+def detect_language(text: str, fallback: str = "en") -> str:
+    """Detect the dominant language of `text` and return an ISO code.
+
+    Uses langdetect (statistical n-gram). Returns the fallback if the
+    text is too short / mixed / detection raises. Result is normalized
+    to a small whitelist; unknown codes fall back too.
+    """
+    text = (text or "").strip()
+    if len(text) < 50:
+        return fallback
+    try:
+        from langdetect import detect, DetectorFactory  # type: ignore
+
+        DetectorFactory.seed = 0
+        code = detect(text[:4000]).lower()
+    except Exception:
+        return fallback
+    # langdetect returns "ko", "en", "zh-cn"... map and whitelist
+    if code in _ALLOWED_LANGS:
+        return code
+    if code.startswith("zh"):
+        return "zh-cn"
+    return fallback
+
+
 def chunk_pages(
     pages: list[PdfPage], target_chars: int = 3000
 ) -> list[tuple[list[int], str]]:
@@ -118,11 +146,14 @@ def _salvage_truncated_array(text: str) -> str:
 
 _SYSTEM_PROMPT = (
     "당신은 텍스트에서 도메인 전문 용어를 추출하는 도구입니다.\n"
-    "사용자가 제공한 텍스트(주로 영어)에서 다음 조건을 만족하는 용어를 찾으세요:\n"
-    "1. 일반 어휘가 아닌 도메인 전문 용어 (기술 명칭, 인명에서 유래한 기법, 포지션 이름 등)\n"
+    "사용자가 제공한 텍스트에서 다음 조건을 만족하는 용어를 찾으세요:\n"
+    "1. 일반 어휘가 아닌 도메인 전문 용어 (기술 명칭, 인명에서 유래한 기법, 해부학 용어, 의학 용어 등)\n"
     "2. 다른 자료에서 일관되게 같은 한국어로 번역되어야 의미가 보존되는 용어\n"
+    "각 용어에 대해 source_lang 필드에 ISO 639-1 코드(en, ko, pt, ja, fr, es, de, it, ru, zh-cn 등)를 포함하세요.\n"
+    "원어가 영어 학술용어면 source_lang='en'이고 ko_term에 한국어 번역을 넣으세요.\n"
+    "원어가 한국어 전문용어인데 표준 한국어 표기가 따로 있다면 source_lang='ko'로 두고 ko_term에 표준 표기를 넣으세요.\n"
     "출력은 반드시 다음 JSON 배열 형식입니다:\n"
-    '[{"source_term": "...", "ko_term": "...", "category": "기술|포지션|개념|장비|기타", "context": "...간단한 출처 문맥..."}]\n'
+    '[{"source_lang": "en|ko|...", "source_term": "...", "ko_term": "...", "category": "기술|해부학|의학|개념|장비|기타", "context": "...간단한 출처 문맥..."}]\n'
     "용어가 없으면 빈 배열 []을 출력하세요.\n"
     "다른 설명 없이 JSON만 출력하세요."
 )
@@ -144,7 +175,7 @@ def _generate(prompt: str, system: str, max_tokens: int = 4096) -> str:
     )
 
 
-def _parse_terms(raw: str, source_lang: str) -> list[ExtractedTerm]:
+def _parse_terms(raw: str, default_source_lang: str) -> list[ExtractedTerm]:
     cleaned = _strip_code_fence(raw)
     try:
         data = json.loads(cleaned)
@@ -166,9 +197,12 @@ def _parse_terms(raw: str, source_lang: str) -> list[ExtractedTerm]:
         kt = (item.get("ko_term") or "").strip()
         if not st or not kt:
             continue
+        # Trust LLM-emitted source_lang if it's in the whitelist; else default.
+        item_lang = (item.get("source_lang") or "").strip().lower()
+        sl = item_lang if item_lang in _ALLOWED_LANGS else default_source_lang
         out.append(
             ExtractedTerm(
-                source_lang=source_lang,
+                source_lang=sl,
                 source_term=st,
                 ko_term=kt,
                 category=(item.get("category") or "").strip() or None,
@@ -187,21 +221,31 @@ def _noop(stage: str, frac: float) -> None: ...
 def extract_terms(
     pdf_path: Path,
     db_path: Path,
-    source_lang: str = "en",
+    source_lang: str | None = None,
     progress: ProgressFn = _noop,
 ) -> int:
     """Open a PDF, extract terms via LLM, store as pending in DB.
+
+    Args:
+        source_lang: ISO language hint. If None, the dominant language is
+            auto-detected from the PDF text. The LLM is also asked to emit
+            per-term source_lang, so a multilingual PDF can yield terms
+            tagged in different languages.
 
     Returns number of unique terms inserted (after dedup).
     """
     pdf_path = pdf_path.resolve()
     progress("opening", 0.0)
     meta, pages = open_pdf(pdf_path)
+    sample = "\n".join(p.text for p in pages[: min(3, len(pages))])
+    detected_lang = source_lang or detect_language(sample, fallback="en")
+    if source_lang is None:
+        logger.info(f"PDF lang auto-detected: {detected_lang}")
     pdf_id = repository.upsert_pdf(
         db_path,
         file_path=str(pdf_path),
         title=meta.title,
-        language=source_lang,
+        language=detected_lang,
         page_count=meta.page_count,
     )
     repository.set_pdf_extraction_status(db_path, pdf_id, "extracting")
@@ -217,8 +261,8 @@ def extract_terms(
             while attempts < 3:
                 attempts += 1
                 try:
-                    raw = _generate(text, system=_SYSTEM_PROMPT, max_tokens=2048)
-                    terms = _parse_terms(raw, source_lang=source_lang)
+                    raw = _generate(text, system=_SYSTEM_PROMPT, max_tokens=4096)
+                    terms = _parse_terms(raw, default_source_lang=detected_lang)
                     break
                 except ValueError as e:
                     logger.warning(

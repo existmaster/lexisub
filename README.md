@@ -42,11 +42,11 @@ uv run lexisub
 You have two ways to populate the glossary:
 
 ### A. Auto-extract from PDFs (recommended)
-1. **PDF 라이브러리** tab → [PDF 추가] → select one or more PDFs (textbooks, course notes, etc.)
-2. The app extracts text via PyMuPDF and asks the local Gemma 3 model to identify domain terms, generating Korean translations.
+1. **PDF 라이브러리** tab → [PDF 추가] → select one or more PDFs (textbooks, course notes, etc.). Source language defaults to **자동 감지** (the PDF's dominant language is detected with `langdetect`); override via the dropdown if needed.
+2. The app extracts text via PyMuPDF and asks the local Gemma 3 model to identify domain terms, generating Korean translations. The LLM also tags each term with its own `source_lang`, so multilingual PDFs (e.g. Korean textbooks with English medical terms) yield terms tagged in different languages automatically.
 3. New terms land in the **용어집** tab with status `pending`.
 4. Review and approve them (double-click toggles approved ↔ pending).
-5. Approved terms are forced verbatim during video translation.
+5. Approved terms are forced verbatim during video translation (only those whose `source_lang` matches the video's detected language).
 
 ### B. CSV import (for existing glossaries)
 - 용어집 tab → [CSV 가져오기] → select a CSV with columns

@@ -22,7 +22,11 @@ from lexisub.db import repository
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("pdfs", nargs="+", type=Path)
-    p.add_argument("--lang", default="en", help="source language hint (default: en)")
+    p.add_argument(
+        "--lang",
+        default="auto",
+        help="ISO source-language hint (e.g. en, ko, pt). 'auto' detects per PDF. (default: auto)",
+    )
     p.add_argument(
         "--db",
         type=Path,
@@ -58,9 +62,10 @@ def main() -> int:
                 last_stage = stage
                 last_pct = pct
 
+        lang_arg = None if args.lang == "auto" else args.lang
         try:
             n = pdf_extractor.extract_terms(
-                pdf, args.db, source_lang=args.lang, progress=on_progress
+                pdf, args.db, source_lang=lang_arg, progress=on_progress
             )
         except Exception as e:
             print(f"\n  failed: {e}")
