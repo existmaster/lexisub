@@ -33,3 +33,6 @@ markers = [
   "heavy: integration tests that download models (>1GB) and run on real hardware",
 ]
 addopts = "-ra -m 'not heavy'"
+
+[tool.hatch.build.targets.wheel.force-include]
+"mma_sub/db/schema.sql" = "mma_sub/db/schema.sql"
