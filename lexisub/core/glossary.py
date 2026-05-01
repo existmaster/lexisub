@@ -26,7 +26,7 @@ def import_csv(db_path: Path, csv_path: Path, default_status: str = "approved") 
 
 
 _PREAMBLE = (
-    "당신은 MMA/격투기 강의 영상의 자막을 한국어로 번역합니다. "
+    "당신은 강의 영상의 자막을 한국어로 번역합니다. "
     "다음 규칙을 엄격히 따르세요:\n"
     "1. 아래 용어집의 용어는 반드시 지정된 한국어로 번역합니다.\n"
     "2. 자연스러운 한국어로 번역하되, 강의 어조(설명체)를 유지합니다.\n"
@@ -35,11 +35,38 @@ _PREAMBLE = (
 )
 
 
-def build_system_prompt(db_path: Path, source_lang: str) -> str:
+def _filter_relevant(
+    rows: list, text: str | None
+) -> list:
+    """If `text` is given, keep only terms whose source_term appears in it
+    (case-insensitive substring match). Drastically shrinks the prompt for
+    long glossaries when most terms aren't relevant to the current chunk.
+    """
+    if text is None:
+        return rows
+    src_lower = text.lower()
+    return [r for r in rows if r["source_term"].lower() in src_lower]
+
+
+def build_system_prompt(
+    db_path: Path,
+    source_lang: str,
+    text: str | None = None,
+    max_terms: int = 40,
+) -> str:
+    """Build the translator system prompt.
+
+    If `text` is provided, only glossary terms that actually appear in
+    `text` are included — keeps the prompt small and the model's
+    instruction-following stable on local 4-bit models.
+    """
     rows = [
         r for r in repository.list_terms(db_path, status="approved")
         if r["source_lang"] == source_lang
     ]
+    rows = _filter_relevant(rows, text)
+    if len(rows) > max_terms:
+        rows = rows[:max_terms]
     if not rows:
         return _PREAMBLE + "\n\n(용어집 없음)"
     lines = ["\n\n[용어집]"]

@@ -44,7 +44,14 @@ def process_video(
     gc.collect()
 
     progress("translating", 0.0)
-    sys_prompt = glossary.build_system_prompt(db_path, source_lang=lang)
+    full_source_text = " ".join(c.text for c in cues)
+    sys_prompt = glossary.build_system_prompt(
+        db_path, source_lang=lang, text=full_source_text
+    )
+    logger.info(
+        f"system prompt: {sys_prompt.count(chr(10) + '- ')} relevant terms "
+        f"(filtered from full glossary)"
+    )
     translated = translator.translate(
         cues, source_lang=lang, system_prompt=sys_prompt,
     )

@@ -76,12 +76,44 @@ class ExtractedTerm:
 
 
 def _strip_code_fence(text: str) -> str:
-    """LLMs often wrap JSON in ```json ... ```. Strip if present."""
+    """LLMs often wrap JSON in ```json ... ```. Strip if present.
+
+    Tolerates a missing closing fence (happens when the model hits the
+    token limit and the array is truncated). Also handles the inline
+    single-line variant.
+    """
     text = text.strip()
-    fence = re.match(r"^```(?:json)?\s*\n(.+?)\n```$", text, re.DOTALL)
-    if fence:
-        return fence.group(1)
+    closed = re.match(r"^```(?:json)?\s*\n?(.+?)\n?```\s*$", text, re.DOTALL)
+    if closed:
+        return closed.group(1).strip()
+    open_only = re.match(r"^```(?:json)?\s*\n?(.+)$", text, re.DOTALL)
+    if open_only:
+        return open_only.group(1).strip()
     return text
+
+
+def _salvage_truncated_array(text: str) -> str:
+    """If the LLM produced a truncated JSON array (no closing `]`),
+    drop the trailing partial object and close the array.
+
+    Example input:
+        [
+          {"source_term": "a", "ko_term": "가"},
+          {"source_term": "b", "ko_term":
+    Output:
+        [
+          {"source_term": "a", "ko_term": "가"}
+        ]
+    """
+    text = text.strip()
+    if not text.startswith("["):
+        return text
+    if text.endswith("]"):
+        return text
+    last_close = text.rfind("}")
+    if last_close == -1:
+        return "[]"
+    return text[: last_close + 1] + "\n]"
 
 
 _SYSTEM_PROMPT = (
@@ -96,7 +128,7 @@ _SYSTEM_PROMPT = (
 )
 
 
-def _generate(prompt: str, system: str, max_tokens: int = 1024) -> str:
+def _generate(prompt: str, system: str, max_tokens: int = 4096) -> str:
     from mlx_lm import load, generate
 
     model, tokenizer = load(config.LLM_MODEL_ID)
@@ -116,8 +148,14 @@ def _parse_terms(raw: str, source_lang: str) -> list[ExtractedTerm]:
     cleaned = _strip_code_fence(raw)
     try:
         data = json.loads(cleaned)
-    except json.JSONDecodeError as e:
-        raise ValueError(f"LLM returned invalid JSON: {e}; raw={raw[:200]!r}")
+    except json.JSONDecodeError:
+        try:
+            data = json.loads(_salvage_truncated_array(cleaned))
+        except json.JSONDecodeError as e:
+            raise ValueError(
+                f"LLM returned invalid JSON (even after salvage): {e}; "
+                f"raw={raw[:200]!r}"
+            )
     if not isinstance(data, list):
         raise ValueError(f"Expected JSON array, got {type(data).__name__}")
     out: list[ExtractedTerm] = []

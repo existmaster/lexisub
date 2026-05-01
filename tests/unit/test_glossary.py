@@ -45,4 +45,25 @@ def test_build_system_prompt_filters_by_lang(tmp_db: Path):
 
 def test_build_system_prompt_with_no_terms_still_returns_text(tmp_db: Path):
     prompt = glossary.build_system_prompt(tmp_db, source_lang="en")
-    assert "MMA" in prompt or "격투기" in prompt
+    assert "한국어" in prompt
+    assert "용어집" in prompt
+
+
+def test_build_system_prompt_filters_by_text(tmp_db: Path):
+    glossary.import_csv(tmp_db, FIXTURE, default_status="approved")
+    prompt = glossary.build_system_prompt(
+        tmp_db, source_lang="en", text="he locked an armbar from guard"
+    )
+    assert "armbar" in prompt
+    assert "guard pass" not in prompt
+    assert "rear naked choke" not in prompt
+
+
+def test_build_system_prompt_max_terms_cap(tmp_db: Path):
+    for i in range(50):
+        repository.upsert_term(
+            tmp_db, "en", f"term_{i:02d}", f"용어_{i:02d}", "기술", "approved"
+        )
+    prompt = glossary.build_system_prompt(tmp_db, source_lang="en", max_terms=40)
+    line_count = prompt.count("\n- ")
+    assert line_count == 40

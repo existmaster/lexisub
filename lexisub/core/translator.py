@@ -25,19 +25,25 @@ def format_chunk_for_llm(chunk: Chunk) -> str:
 
     Context lines are prefixed with `[ctx]` and rendered before/after the
     numbered MAIN block. The LLM is told to only translate the numbered lines.
+
+    The structure is kept identical even when context blocks are empty, so
+    the model sees a consistent shape on the first chunk vs. middle chunks
+    (small local LLMs are sensitive to this).
     """
     parts: list[str] = []
-    if chunk.before:
-        parts.append("[ctx-before]")
-        for c in chunk.before:
-            parts.append(c.text)
+    parts.append("[ctx-before]")
+    for c in chunk.before:
+        parts.append(c.text)
+    if not chunk.before:
+        parts.append("(없음)")
     parts.append("[translate-these]")
     for i, c in enumerate(chunk.main, start=1):
         parts.append(f"{i}: {c.text}")
-    if chunk.after:
-        parts.append("[ctx-after]")
-        for c in chunk.after:
-            parts.append(c.text)
+    parts.append("[ctx-after]")
+    for c in chunk.after:
+        parts.append(c.text)
+    if not chunk.after:
+        parts.append("(없음)")
     return "\n".join(parts)
 
 
@@ -120,7 +126,8 @@ def translate(
                     + retry_hint
                     + f"\n\n[translate-these] 블록의 번호 매겨진 줄을 한국어로 번역하세요. "
                     f"반드시 1번부터 {n}번까지 모든 줄을 동일한 `<번호>: <번역>` 형식으로 출력해야 합니다. "
-                    f"줄을 빠뜨리지 말고, 번역할 내용이 없는 줄도 원문 그대로 출력하세요.",
+                    f"줄을 빠뜨리지 말고, 영어 원문은 출력하지 말고, "
+                    f"한국어 번역만 출력하세요.",
                     system=system_prompt,
                     max_tokens=max_tokens,
                 )
