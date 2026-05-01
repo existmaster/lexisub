@@ -2,6 +2,9 @@
 name = "lexisub"
 version = "0.1.0"
 description = "Local desktop app: video subtitles in Korean with custom glossary support"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+authors = [{ name = "Sung-Yeol Yun" }]
 requires-python = ">=3.12,<3.13"
 dependencies = [
   "PySide6>=6.7",

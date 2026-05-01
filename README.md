@@ -43,4 +43,7 @@ uv run pytest -m heavy              # 3 model-download tests (~4GB, slow)
 - Not packaged as `.app` yet — runs via `uv run lexisub`
 
 ## License
-MIT (see LICENSE)
+
+Apache License 2.0 — see [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
+Note: this software downloads and uses Google's Gemma model on first run. Use of the model is governed by the [Gemma Terms of Use](https://ai.google.dev/gemma/terms), independent of this project's Apache 2.0 license.

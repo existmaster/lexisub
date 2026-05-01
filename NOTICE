@@ -1,0 +1,32 @@
+Lexisub
+Copyright 2026 Sung-Yeol Yun
+
+This product includes software developed by Sung-Yeol Yun and contributors.
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+------------------------------------------------------------------------------
+Third-party dependencies and runtime model attributions
+------------------------------------------------------------------------------
+
+This software depends on the following third-party libraries (installed via uv,
+not redistributed in source). Each remains under its own license:
+
+- PySide6                — LGPL v3 / Commercial (The Qt Company)
+- mlx-whisper, mlx-lm    — MIT (Apple Inc.)
+- mlx                    — MIT (Apple Inc.)
+- loguru                 — MIT
+- platformdirs           — MIT
+- pytest, pytest-qt,
+  pytest-mock            — MIT
+- ffmpeg                 — LGPL/GPL (system dependency, not bundled)
+
+This software does NOT redistribute the following models. They are downloaded
+on first run from Hugging Face Hub by the end user, and their use is governed
+by their respective licenses:
+
+- Whisper large-v3-turbo (mlx-community/whisper-large-v3-turbo)
+    Original: OpenAI Whisper, MIT License.
+
+- Gemma 3 4B IT 4-bit (mlx-community/gemma-3-4b-it-4bit)
+    Governed by the Gemma Terms of Use (https://ai.google.dev/gemma/terms).
+    End users are responsible for reviewing and complying with these terms.
