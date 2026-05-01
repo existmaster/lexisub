@@ -24,6 +24,7 @@ def init_db(path: Path) -> None:
         conn.executescript(_read_schema())
         # Idempotent migrations for older DBs created by v0.1/v0.2.
         _add_column_if_missing(conn, "terms", "definition", "TEXT")
+        _add_column_if_missing(conn, "terms", "evidence_level", "TEXT")
         conn.commit()
 
 
@@ -42,22 +43,75 @@ def upsert_term(
     category: str | None,
     status: str = "pending",
     definition: str | None = None,
+    evidence_level: str | None = None,
 ) -> int:
+    """Insert or update a term. evidence_level values:
+        - 'from_text'  : LLM saw the foreign↔Korean pair printed in the PDF
+        - 'inferred'   : LLM produced ko_term from its own knowledge
+        - 'csv_import' : came from a CSV (user-curated)
+        - 'user_edit'  : user edited the term in the GUI (highest trust)
+        - None / 'unknown' : legacy / not annotated
+    """
     with connect(path) as conn:
         cur = conn.execute(
             """
-            INSERT INTO terms (source_lang, source_term, ko_term, category, status, definition)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO terms (source_lang, source_term, ko_term, category, status,
+                               definition, evidence_level)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(source_lang, source_term, ko_term)
             DO UPDATE SET category=excluded.category,
                           status=excluded.status,
                           definition=COALESCE(excluded.definition, terms.definition),
+                          evidence_level=COALESCE(excluded.evidence_level, terms.evidence_level),
                           updated_at=CURRENT_TIMESTAMP
             RETURNING id
             """,
-            (source_lang, source_term, ko_term, category, status, definition),
+            (source_lang, source_term, ko_term, category, status, definition,
+             evidence_level),
         )
         return cur.fetchone()[0]
+
+
+def update_term(
+    path: Path,
+    term_id: int,
+    *,
+    ko_term: str | None = None,
+    category: str | None = None,
+    status: str | None = None,
+    definition: str | None = None,
+    evidence_level: str | None = None,
+) -> None:
+    """Edit selected fields on an existing term. source_lang/source_term
+    are not editable (would conflict with the UNIQUE key — delete and
+    re-add to rename). Pass `evidence_level='user_edit'` when the change
+    came from the GUI editor so the term gets promoted to highest trust.
+    """
+    fields: list[str] = []
+    args: list = []
+    if ko_term is not None:
+        fields.append("ko_term = ?")
+        args.append(ko_term)
+    if category is not None:
+        fields.append("category = ?")
+        args.append(category if category else None)
+    if status is not None:
+        fields.append("status = ?")
+        args.append(status)
+    if definition is not None:
+        fields.append("definition = ?")
+        args.append(definition if definition else None)
+    if evidence_level is not None:
+        fields.append("evidence_level = ?")
+        args.append(evidence_level)
+    if not fields:
+        return
+    fields.append("updated_at = CURRENT_TIMESTAMP")
+    sql = f"UPDATE terms SET {', '.join(fields)} WHERE id = ?"
+    args.append(term_id)
+    with connect(path) as conn:
+        conn.execute(sql, args)
+        conn.commit()
 
 
 def list_terms(path: Path, status: str | None = None) -> list[sqlite3.Row]:

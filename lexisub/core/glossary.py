@@ -20,6 +20,7 @@ def import_csv(db_path: Path, csv_path: Path, default_status: str = "approved") 
                 ko_term=row["ko_term"].strip(),
                 category=(row.get("category") or "").strip() or None,
                 status=default_status,
+                evidence_level="csv_import",
             )
             count += 1
     return count

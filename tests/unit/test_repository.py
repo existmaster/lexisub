@@ -225,6 +225,53 @@ def test_translation_pairs_idempotent(tmp_db: Path):
     assert repository.count_translation_pairs(tmp_db) == 1
 
 
+def test_update_term_changes_fields(tmp_db: Path):
+    tid = repository.upsert_term(
+        tmp_db, "en", "Eversion", "회내", "기술", "pending",
+        definition="잘못된 추론.",
+        evidence_level="inferred",
+    )
+    repository.update_term(
+        tmp_db, tid,
+        ko_term="외번",
+        definition="발이 외측으로 회전하는 동작.",
+        status="approved",
+        evidence_level="user_edit",
+    )
+    row = repository.get_term(tmp_db, tid)
+    assert row["ko_term"] == "외번"
+    assert row["status"] == "approved"
+    assert row["definition"] == "발이 외측으로 회전하는 동작."
+    assert row["evidence_level"] == "user_edit"
+
+
+def test_update_term_preserves_unspecified_fields(tmp_db: Path):
+    tid = repository.upsert_term(
+        tmp_db, "en", "X", "엑스", "기술", "approved",
+        definition="원래 정의.",
+        evidence_level="from_text",
+    )
+    repository.update_term(tmp_db, tid, ko_term="엑쓰")
+    row = repository.get_term(tmp_db, tid)
+    assert row["ko_term"] == "엑쓰"
+    assert row["status"] == "approved"
+    assert row["definition"] == "원래 정의."
+    assert row["evidence_level"] == "from_text"
+
+
+def test_csv_import_sets_evidence_csv_import(tmp_db: Path, tmp_path: Path):
+    from lexisub.core import glossary as glossary_mod
+    csv_path = tmp_path / "g.csv"
+    csv_path.write_text(
+        "source_lang,source_term,ko_term,category\n"
+        "en,armbar,암바,기술\n",
+        encoding="utf-8",
+    )
+    glossary_mod.import_csv(tmp_db, csv_path)
+    rows = repository.list_terms(tmp_db)
+    assert rows[0]["evidence_level"] == "csv_import"
+
+
 def test_v01_db_migrates_to_definition(tmp_path: Path):
     """Simulate an old DB without `definition`: init_db should add the
     column without losing existing rows.

@@ -10,10 +10,11 @@ from PySide6.QtWidgets import (
 )
 from lexisub.core import glossary
 from lexisub.db import repository
+from lexisub.gui.term_edit_dialog import TermEditDialog
 
 
 class GlossaryTab(QWidget):
-    COLUMNS = ["언어", "원어 용어", "한국어 번역", "분류", "상태", "출처"]
+    COLUMNS = ["언어", "원어 용어", "한국어 번역", "분류", "상태", "근거", "출처"]
 
     def __init__(self, db_path: Path) -> None:
         super().__init__()
@@ -38,6 +39,12 @@ class GlossaryTab(QWidget):
         self.import_btn = QPushButton("CSV 가져오기")
         self.import_btn.setObjectName("import_button")
         self.import_btn.clicked.connect(self._on_import)
+
+        self.edit_btn = QPushButton("편집")
+        self.edit_btn.setObjectName("edit_term_button")
+        self.edit_btn.setToolTip("선택한 용어의 한국어 번역, 정의, 분류, 상태를 편집합니다.")
+        self.edit_btn.clicked.connect(self._on_edit_selected)
+        self.edit_btn.setEnabled(False)
 
         self.delete_btn = QPushButton("선택 삭제")
         self.delete_btn.setObjectName("delete_terms_button")
@@ -66,6 +73,7 @@ class GlossaryTab(QWidget):
         controls.setSpacing(8)
         controls.addWidget(self.count_label)
         controls.addStretch()
+        controls.addWidget(self.edit_btn)
         controls.addWidget(self.approve_selected_btn)
         controls.addWidget(self.approve_all_btn)
         controls.addWidget(self.delete_btn)
@@ -90,12 +98,13 @@ class GlossaryTab(QWidget):
         self._backspace_shortcut = QShortcut(QKeySequence("Backspace"), self.table)
         self._backspace_shortcut.activated.connect(self._on_delete_selected)
         h = self.table.horizontalHeader()
-        h.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        h.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        h.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
-        h.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
-        h.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
-        h.setStretchLastSection(True)
+        h.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)  # 언어
+        h.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)            # 원어
+        h.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)            # 한국어
+        h.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)  # 분류
+        h.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)  # 상태
+        h.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)  # 근거
+        h.setStretchLastSection(True)                                        # 출처
 
         # Empty state
         self.empty_label = QLabel(
@@ -167,19 +176,32 @@ class GlossaryTab(QWidget):
             return Path(fallback_path).stem
         return s
 
+    @staticmethod
+    def _evidence_short(level: str | None) -> str:
+        return {
+            "from_text": "본문",
+            "inferred": "추론 ⚠",
+            "user_edit": "사용자",
+            "csv_import": "CSV",
+        }.get(level or "", "—")
+
     def _refresh(self) -> None:
         rows = repository.list_terms(self.db_path)
         self.table.setRowCount(len(rows))
+        inferred_count = 0
         for r, term in enumerate(rows):
             sources = repository.list_sources_for_term(self.db_path, term["id"])
             src_label = ", ".join(
                 f"{self._readable_title(s['pdf_title'], s['pdf_path'])}:p{s['page_no']}"
                 for s in sources
             ) if sources else "—"
+            ev = term["evidence_level"] if "evidence_level" in term.keys() else None
+            if ev == "inferred":
+                inferred_count += 1
             cells = [
                 term["source_lang"], term["source_term"],
                 term["ko_term"], term["category"] or "",
-                term["status"], src_label,
+                term["status"], self._evidence_short(ev), src_label,
             ]
             for c, val in enumerate(cells):
                 item = QTableWidgetItem(str(val))
@@ -187,8 +209,9 @@ class GlossaryTab(QWidget):
                 self.table.setItem(r, c, item)
         approved = sum(1 for r in rows if r["status"] == "approved")
         pending = len(rows) - approved
+        suffix = f"  ·  ⚠ 추론 {inferred_count}개" if inferred_count else ""
         self.count_label.setText(
-            f"총 {len(rows)}개  ·  승인 {approved}개  ·  보류 {pending}개"
+            f"총 {len(rows)}개  ·  승인 {approved}개  ·  보류 {pending}개{suffix}"
         )
         self.stack.setCurrentIndex(1 if rows else 0)
 
@@ -219,11 +242,38 @@ class GlossaryTab(QWidget):
         repository.set_term_status(self.db_path, term_id, new_status)
         self._refresh()
 
+    def _on_edit_selected(self) -> None:
+        ids = self._selected_term_ids()
+        if len(ids) != 1:
+            return
+        term = repository.get_term(self.db_path, ids[0])
+        if not term:
+            return
+        dlg = TermEditDialog(term, parent=self)
+        if dlg.exec() != dlg.DialogCode.Accepted:
+            return
+        v = dlg.values()
+        if not v["ko_term"]:
+            QMessageBox.warning(self, "입력 오류", "한국어 번역은 비워둘 수 없습니다.")
+            return
+        repository.update_term(
+            self.db_path,
+            ids[0],
+            ko_term=v["ko_term"],
+            category=v["category"] or "",
+            status=v["status"],
+            definition=v["definition"],
+            evidence_level="user_edit",
+        )
+        self._refresh()
+        self._update_detail()
+
     def _on_selection_changed(self) -> None:
         rows = {idx.row() for idx in self.table.selectedIndexes()}
-        has_selection = bool(rows)
-        self.delete_btn.setEnabled(has_selection)
-        self.approve_selected_btn.setEnabled(has_selection)
+        n = len(rows)
+        self.delete_btn.setEnabled(n > 0)
+        self.approve_selected_btn.setEnabled(n > 0)
+        self.edit_btn.setEnabled(n == 1)  # edit only one row at a time
 
     @staticmethod
     def _esc(s: str) -> str:
