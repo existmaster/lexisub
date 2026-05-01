@@ -10,3 +10,16 @@ dist/
 .DS_Store
 models/
 .coverage
+
+# User-provided demo content (not redistributed)
+demos/videos/
+demos/outputs/
+*.mp4
+*.mov
+*.mkv
+*.m4v
+*.avi
+*.webm
+# Allow committed test fixtures
+!tests/fixtures/*.mp4
+!tests/fixtures/*.mkv

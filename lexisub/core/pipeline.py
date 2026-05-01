@@ -16,6 +16,7 @@ class PipelineResult:
     srt_path: Path
     mkv_path: Path
     source_lang: str
+    source_srt_path: Path
 
 
 def _noop(stage: str, frac: float) -> None: ...
@@ -38,6 +39,8 @@ def process_video(
     cues, lang = stt.transcribe(wav)
     logger.info(f"STT done: {len(cues)} cues, lang={lang}")
     progress("stt", 1.0)
+    source_srt_path = out_dir / f"{stem}.src.srt"
+    source_srt_path.write_text(subtitle.serialize_srt(cues), encoding="utf-8")
     gc.collect()
 
     progress("translating", 0.0)
@@ -57,4 +60,9 @@ def process_video(
     progress("muxing", 1.0)
 
     progress("done", 1.0)
-    return PipelineResult(srt_path=srt_path, mkv_path=mkv_path, source_lang=lang)
+    return PipelineResult(
+        srt_path=srt_path,
+        mkv_path=mkv_path,
+        source_lang=lang,
+        source_srt_path=source_srt_path,
+    )
