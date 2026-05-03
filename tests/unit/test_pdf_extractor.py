@@ -116,3 +116,22 @@ def test_parse_terms_no_definition_field():
     )
     terms = _parse_terms(raw, default_source_lang="en")
     assert terms[0].definition is None
+
+
+def test_detect_evidence_from_text_when_ko_present():
+    from lexisub.core.pdf_extractor import _detect_evidence
+    chunk = "보행의평가\nAssessment of Gait\n발꿈치 접지는 보행 사이클의 시작이다. Heel Strike."
+    assert _detect_evidence("Heel Strike", "발꿈치 접지", chunk) == "from_text"
+
+
+def test_detect_evidence_inferred_when_ko_absent():
+    from lexisub.core.pdf_extractor import _detect_evidence
+    chunk = "Eversion is a movement of the foot away from midline."
+    # LLM produced "회내" but text only has English — must be inferred
+    assert _detect_evidence("Eversion", "회내", chunk) == "inferred"
+
+
+def test_detect_evidence_inferred_for_english_only_pdf():
+    from lexisub.core.pdf_extractor import _detect_evidence
+    chunk = "The kimura is a shoulder lock named after Masahiko Kimura."
+    assert _detect_evidence("kimura", "키무라", chunk) == "inferred"

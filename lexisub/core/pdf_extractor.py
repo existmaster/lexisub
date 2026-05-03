@@ -184,11 +184,8 @@ _SYSTEM_PROMPT = (
     "원어가 한국어 전문용어인데 표준 한국어 표기가 따로 있다면 source_lang='ko'로 두고 ko_term에 표준 표기를 넣으세요.\n"
     "definition 필드는 본문에서 그 용어가 어떻게 정의/설명되는지 한국어로 1~2 문장 요약을 넣으세요. "
     "본문에 정의가 명시적으로 등장하지 않으면 빈 문자열로 두세요. 추측하지 마세요.\n"
-    "evidence 필드: 본문에 외국어 용어와 한국어 표기가 함께(병기) 등장한 경우 'from_text', "
-    "본문에는 외국어만 있고 한국어 번역은 본인이 알고 있는 표준 용어로 채운 경우 'inferred'를 넣으세요. "
-    "이 필드는 사용자가 어느 항목을 추가 검증해야 하는지 판단하는 데 사용됩니다 — 정직하게 표시하세요.\n"
     "출력은 반드시 다음 JSON 배열 형식입니다:\n"
-    '[{"source_lang": "en|ko|...", "source_term": "...", "ko_term": "...", "category": "기술|해부학|의학|개념|장비|인명|기타", "context": "...간단한 출처 문맥...", "definition": "...정의 또는 빈 문자열...", "evidence": "from_text|inferred"}]\n'
+    '[{"source_lang": "en|ko|...", "source_term": "...", "ko_term": "...", "category": "기술|해부학|의학|개념|장비|인명|기타", "context": "...간단한 출처 문맥...", "definition": "...정의 또는 빈 문자열..."}]\n'
     "용어가 없으면 빈 배열 []을 출력하세요.\n"
     "다른 설명 없이 JSON만 출력하세요."
 )
@@ -235,8 +232,6 @@ def _parse_terms(raw: str, default_source_lang: str) -> list[ExtractedTerm]:
         # Trust LLM-emitted source_lang if it's in the whitelist; else default.
         item_lang = (item.get("source_lang") or "").strip().lower()
         sl = item_lang if item_lang in _ALLOWED_LANGS else default_source_lang
-        ev_raw = (item.get("evidence") or "").strip().lower()
-        ev = ev_raw if ev_raw in {"from_text", "inferred"} else None
         out.append(
             ExtractedTerm(
                 source_lang=sl,
@@ -245,10 +240,33 @@ def _parse_terms(raw: str, default_source_lang: str) -> list[ExtractedTerm]:
                 category=(item.get("category") or "").strip() or None,
                 context=(item.get("context") or "").strip() or None,
                 definition=(item.get("definition") or "").strip() or None,
-                evidence_level=ev,
+                evidence_level=None,  # set later by _detect_evidence
             )
         )
     return out
+
+
+def _detect_evidence(source_term: str, ko_term: str, chunk_text: str) -> str:
+    """Heuristic, code-side evidence detection.
+
+    LLM self-reporting (`from_text` / `inferred`) turned out to be
+    unreliable on real material — the model labelled everything as
+    `inferred` even on a Korean-English bilingual PDF. So we replace it
+    with a deterministic check on the actual chunk text:
+
+    - If `ko_term` substring is present in the chunk text → `from_text`
+      (the Korean wording was right there; the LLM didn't invent it).
+    - Otherwise → `inferred`.
+
+    This favours precision over recall: if the bilingual rendering used
+    a slightly different Korean spelling, we err on `inferred` and let
+    the user verify, which is the safer default.
+    """
+    if not source_term or not ko_term:
+        return "inferred"
+    if ko_term in chunk_text:
+        return "from_text"
+    return "inferred"
 
 
 ProgressFn = Callable[[str, float], None]
@@ -322,6 +340,8 @@ def extract_terms(
                 continue
 
             for t in terms:
+                # Code-side evidence detection — replaces LLM self-reporting.
+                evidence = _detect_evidence(t.source_term, t.ko_term, text)
                 term_id = repository.upsert_term(
                     db_path,
                     source_lang=t.source_lang,
@@ -330,7 +350,7 @@ def extract_terms(
                     category=t.category,
                     status="pending",
                     definition=t.definition,
-                    evidence_level=t.evidence_level,
+                    evidence_level=evidence,
                 )
                 repository.add_term_source(
                     db_path,
