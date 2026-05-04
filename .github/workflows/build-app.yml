@@ -57,14 +57,18 @@ jobs:
           cd dist
           ZIP_NAME="Lexisub-${{ steps.ver.outputs.tag }}-macos-arm64.zip"
           ditto -c -k --keepParent --sequesterRsrc Lexisub.app "$ZIP_NAME"
-          ls -lh "$ZIP_NAME"
+          # Bundle the user guide alongside the .app so recipients have both.
+          cp ../USER_GUIDE.ko.md USER_GUIDE.ko.md
+          ls -lh "$ZIP_NAME" USER_GUIDE.ko.md
           echo "zip_path=dist/$ZIP_NAME" >> "$GITHUB_OUTPUT"
 
       - name: Upload as workflow artifact
         uses: actions/upload-artifact@v4
         with:
           name: Lexisub-${{ steps.ver.outputs.tag }}-macos-arm64
-          path: dist/Lexisub-*.zip
+          path: |
+            dist/Lexisub-*.zip
+            dist/USER_GUIDE.ko.md
           if-no-files-found: error
 
       - name: Attach to GitHub Release
@@ -72,5 +76,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.ver.outputs.tag }}
-          files: dist/Lexisub-*.zip
+          files: |
+            dist/Lexisub-*.zip
+            dist/USER_GUIDE.ko.md
           fail_on_unmatched_files: true

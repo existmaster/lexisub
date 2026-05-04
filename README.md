@@ -6,6 +6,8 @@ Built and tested for MMA training videos initially (the trainer 독진수's use 
 
 Apple Silicon Mac only. Runs entirely locally; no cloud API calls.
 
+📖 **사용 설명서 (한국어)**: [USER_GUIDE.ko.md](USER_GUIDE.ko.md) — 처음 사용하시면 이쪽부터 읽어보세요. 워크플로우, GUI 기능, 자주 묻는 질문이 정리되어 있습니다.
+
 ## Install (recommended for end users)
 
 Download the latest pre-built `.app` zip from [Releases](https://github.com/existmaster/lexisub/releases/latest), then:
