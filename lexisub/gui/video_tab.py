@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
 )
 from loguru import logger
 from lexisub.core.pipeline import process_video, PipelineResult
+from lexisub.gui.subtitle_editor import SubtitleEditDialog
 
 
 class _Worker(QThread):
@@ -121,9 +122,17 @@ class VideoTab(QWidget):
         self.result_paths = QLabel("")
         self.result_paths.setProperty("role", "caption")
         self.result_paths.setWordWrap(True)
+        self.edit_subs_btn = QPushButton("자막 편집")
+        self.edit_subs_btn.setObjectName("edit_subs_button")
+        self.edit_subs_btn.setToolTip(
+            "한국어 자막을 줄별로 편집하고 .mkv를 재mux합니다. "
+            "번역 누락(영어 그대로) / 음역 의심 줄을 자동 하이라이트합니다."
+        )
+        self.edit_subs_btn.clicked.connect(self._on_edit_subs)
         self.open_folder_btn = QPushButton("폴더 열기")
         self.open_folder_btn.clicked.connect(self._on_open_folder)
         result_btn_row = QHBoxLayout()
+        result_btn_row.addWidget(self.edit_subs_btn)
         result_btn_row.addWidget(self.open_folder_btn)
         result_btn_row.addStretch()
         result_layout.addWidget(self.result_title)
@@ -255,3 +264,15 @@ class VideoTab(QWidget):
         if not self.last_result:
             return
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.last_result.mkv_path.parent)))
+
+    def _on_edit_subs(self) -> None:
+        if not self.last_result or not self.video_path:
+            return
+        dlg = SubtitleEditDialog(
+            video_path=self.video_path,
+            source_srt=self.last_result.source_srt_path,
+            ko_srt=self.last_result.srt_path,
+            mkv_out=self.last_result.mkv_path,
+            parent=self,
+        )
+        dlg.exec()
