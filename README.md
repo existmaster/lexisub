@@ -10,22 +10,19 @@ Apple Silicon Mac only. Runs entirely locally; no cloud API calls.
 
 ## Install (recommended for end users)
 
-Download the latest pre-built `.app` zip from [Releases](https://github.com/existmaster/lexisub/releases/latest), then:
+[Releases 페이지](https://github.com/existmaster/lexisub/releases/latest)에서 **`Lexisub-vX.Y.Z-macos-arm64.dmg`** 다운로드.
 
-```bash
-unzip Lexisub-v*-macos-arm64.zip
-xattr -dr com.apple.quarantine Lexisub.app
-open Lexisub.app
-```
+1. DMG 더블클릭 → Finder 윈도우가 열림
+2. Lexisub.app을 옆에 보이는 Applications 폴더로 드래그
+3. 처음 한 번만: Applications에서 Lexisub 우클릭(Control+클릭) → **열기**
+4. 첫 실행 시 약 4GB의 AI 모델 자동 다운로드 (한 번만, 이후 즉시 동작)
 
-The `.app` is unsigned (no Apple Developer signature). macOS will warn on first launch — use the `xattr` command above, or right-click the app and choose **Open** the first time.
+ffmpeg는 앱 안에 자동 포함됩니다 (별도 설치 불필요).
 
-You also need `ffmpeg`:
-```bash
-brew install ffmpeg
-```
+DMG 안에는 `사용설명서.html`도 들어 있어 더블클릭하면 한국어 가이드가 브라우저로 열립니다.
 
-On first run, the app downloads ~4GB of ML models (Whisper + Gemma 3 4B) to `~/.cache/huggingface/`. Subsequent launches are instant.
+> **고급 사용자용**: zip 형태도 같이 첨부됩니다 (`Lexisub-vX.Y.Z-macos-arm64.zip`).
+> 명령행 사용 시: `unzip ... && xattr -dr com.apple.quarantine Lexisub.app && open Lexisub.app`
 
 ## Run from source (developers)
 ```

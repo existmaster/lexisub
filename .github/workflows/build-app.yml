@@ -1,4 +1,4 @@
-name: Build macOS .app
+name: Build macOS .app + DMG
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: 'Attach .zip to this existing release tag (e.g. v0.1.0). Leave empty to upload as workflow artifact only.'
+        description: 'Attach artifacts to this existing release tag (e.g. v0.5.0). Leave empty to upload as workflow artifact only.'
         required: false
         default: ''
 
@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   build:
-    name: Build .app on Apple Silicon
+    name: Build on Apple Silicon
     runs-on: macos-14
     timeout-minutes: 30
 
@@ -33,8 +33,11 @@ jobs:
       - name: Pin Python 3.12
         run: uv python install 3.12
 
-      - name: Sync dependencies (dev only — exclude `ocr` extra to slim the .app)
+      - name: Sync dependencies (dev only — keep `ocr` extra out of bundle)
         run: uv sync --extra dev
+
+      - name: Install pandoc (for HTML user guide)
+        run: brew install pandoc
 
       - name: Compute release tag
         id: ver
@@ -50,17 +53,79 @@ jobs:
       - name: Build .app via PyInstaller
         run: ./scripts/build_app.sh
 
+      - name: Convert user guide to HTML
+        run: |
+          pandoc USER_GUIDE.ko.md \
+            --standalone \
+            --metadata title="Lexisub 사용 설명서" \
+            --metadata lang=ko \
+            --to html5 \
+            --css=docs/guide.css \
+            --output USER_GUIDE.ko.html
+        # CSS file is optional; pandoc warns and ignores if missing.
+        continue-on-error: true
+
+      - name: Convert user guide to HTML (fallback no-css)
+        if: always()
+        run: |
+          if [ ! -s USER_GUIDE.ko.html ]; then
+            pandoc USER_GUIDE.ko.md \
+              --standalone \
+              --metadata title="Lexisub 사용 설명서" \
+              --metadata lang=ko \
+              --to html5 \
+              --output USER_GUIDE.ko.html
+          fi
+
       - name: Compress .app (ditto preserves macOS metadata)
-        id: zip
         run: |
           set -euo pipefail
           cd dist
           ZIP_NAME="Lexisub-${{ steps.ver.outputs.tag }}-macos-arm64.zip"
           ditto -c -k --keepParent --sequesterRsrc Lexisub.app "$ZIP_NAME"
-          # Bundle the user guide alongside the .app so recipients have both.
-          cp ../USER_GUIDE.ko.md USER_GUIDE.ko.md
-          ls -lh "$ZIP_NAME" USER_GUIDE.ko.md
-          echo "zip_path=dist/$ZIP_NAME" >> "$GITHUB_OUTPUT"
+          cp ../USER_GUIDE.ko.md .
+          cp ../USER_GUIDE.ko.html .
+
+      - name: Build DMG (drag-and-drop installer)
+        run: |
+          set -euo pipefail
+          STAGING="dist/dmg-staging"
+          rm -rf "$STAGING"
+          mkdir -p "$STAGING"
+          # macOS-standard layout: app + Applications symlink + the guide.
+          cp -R dist/Lexisub.app "$STAGING/Lexisub.app"
+          cp USER_GUIDE.ko.html "$STAGING/사용설명서.html"
+          cp USER_GUIDE.ko.md "$STAGING/사용설명서.md"
+          # First-run README written inline so users see it immediately
+          cat > "$STAGING/처음 실행하는 법.txt" <<'EOF'
+          Lexisub 처음 실행하는 법
+          ─────────────────────────────────
+
+          1. 왼쪽의 [Lexisub] 아이콘을
+             오른쪽 [Applications] 폴더로 끌어다 놓으세요.
+
+          2. Finder의 응용 프로그램 폴더에서 Lexisub을 찾으세요.
+
+          3. 처음 한 번만:
+             Lexisub 아이콘을 우클릭(Control+클릭) → "열기"를 누르세요.
+             ("확인되지 않은 개발자" 경고 → "열기" 한 번 누르면 됩니다.)
+
+          4. 처음 영상을 처리하면 약 4GB의 AI 모델을 자동으로
+             다운로드합니다(한 번만). 이후엔 즉시 동작합니다.
+
+          5. 자세한 사용 방법은 같은 폴더의 "사용설명서.html"을 더블클릭
+             하면 브라우저로 열립니다.
+
+          ─────────────────────────────────
+          EOF
+          ln -s /Applications "$STAGING/Applications"
+          DMG_NAME="Lexisub-${{ steps.ver.outputs.tag }}-macos-arm64.dmg"
+          hdiutil create \
+            -volname "Lexisub ${{ steps.ver.outputs.tag }}" \
+            -srcfolder "$STAGING" \
+            -ov -format UDZO \
+            "dist/$DMG_NAME"
+          ls -lh "dist/$DMG_NAME"
 
       - name: Upload as workflow artifact
         uses: actions/upload-artifact@v4
@@ -68,7 +133,9 @@ jobs:
           name: Lexisub-${{ steps.ver.outputs.tag }}-macos-arm64
           path: |
             dist/Lexisub-*.zip
+            dist/Lexisub-*.dmg
             dist/USER_GUIDE.ko.md
+            dist/USER_GUIDE.ko.html
           if-no-files-found: error
 
       - name: Attach to GitHub Release
@@ -78,5 +145,7 @@ jobs:
           tag_name: ${{ steps.ver.outputs.tag }}
           files: |
             dist/Lexisub-*.zip
+            dist/Lexisub-*.dmg
             dist/USER_GUIDE.ko.md
+            dist/USER_GUIDE.ko.html
           fail_on_unmatched_files: true

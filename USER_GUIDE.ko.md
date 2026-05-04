@@ -5,31 +5,21 @@
 
 ---
 
-## 1. 빠르게 시작하기 (5분)
+## 1. 빠르게 시작하기 (3분)
 
-### 1-1. 사전 준비 (한 번만)
+### 1-1. 다운로드 + 설치 (DMG 권장 — 가장 쉬움)
 
-```bash
-brew install ffmpeg
-```
+1. [Releases 페이지](https://github.com/existmaster/lexisub/releases/latest)에서 **`Lexisub-vX.Y.Z-macos-arm64.dmg`** 다운로드
+2. DMG 파일 더블클릭 → Finder 윈도우가 열립니다
+3. **Lexisub.app을 옆에 있는 Applications 폴더로 드래그**
+4. Finder의 **응용 프로그램** 폴더로 이동
+5. 처음 한 번만: **Lexisub 아이콘을 우클릭**(Control+클릭) → **열기**
 
-> Homebrew가 없으면 먼저 [brew.sh](https://brew.sh)에서 설치하세요.
+   "확인되지 않은 개발자" 경고가 뜨면 [열기]를 한 번 더 누르면 됩니다. 다음부터는 일반적으로 더블클릭만으로 실행됩니다.
 
-### 1-2. 다운로드 + 실행
+> ffmpeg는 앱 안에 자동 포함되어 있어 별도 설치 불필요. 터미널 명령도 필요 없습니다.
 
-1. [Releases 페이지](https://github.com/existmaster/lexisub/releases/latest)에서 최신 `Lexisub-vX.Y.Z-macos-arm64.zip` 다운로드
-2. 압축 풀기(더블클릭)
-3. 터미널에서 격리 해제 + 실행:
-
-```bash
-cd ~/Downloads     # zip을 푼 위치에 맞게
-xattr -dr com.apple.quarantine Lexisub.app
-open Lexisub.app
-```
-
-> macOS Gatekeeper가 "확인되지 않은 개발자" 경고를 띄우는데, `xattr` 명령으로 해제했으니 더블클릭해도 그대로 열립니다. 안 열리면 우클릭 → **열기**.
-
-### 1-3. 첫 실행 — 모델 다운로드
+### 1-2. 첫 실행 — 모델 다운로드
 
 처음 영상을 처리하면 약 **4GB의 ML 모델**이 자동 다운로드됩니다 (`~/.cache/huggingface/`에 저장).
 
