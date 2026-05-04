@@ -36,9 +36,6 @@ jobs:
       - name: Sync dependencies (dev only — keep `ocr` extra out of bundle)
         run: uv sync --extra dev
 
-      - name: Install pandoc (for HTML user guide)
-        run: brew install pandoc
-
       - name: Compute release tag
         id: ver
         run: |
@@ -53,30 +50,6 @@ jobs:
       - name: Build .app via PyInstaller
         run: ./scripts/build_app.sh
 
-      - name: Convert user guide to HTML
-        run: |
-          pandoc USER_GUIDE.ko.md \
-            --standalone \
-            --metadata title="Lexisub 사용 설명서" \
-            --metadata lang=ko \
-            --to html5 \
-            --css=docs/guide.css \
-            --output USER_GUIDE.ko.html
-        # CSS file is optional; pandoc warns and ignores if missing.
-        continue-on-error: true
-
-      - name: Convert user guide to HTML (fallback no-css)
-        if: always()
-        run: |
-          if [ ! -s USER_GUIDE.ko.html ]; then
-            pandoc USER_GUIDE.ko.md \
-              --standalone \
-              --metadata title="Lexisub 사용 설명서" \
-              --metadata lang=ko \
-              --to html5 \
-              --output USER_GUIDE.ko.html
-          fi
-
       - name: Compress .app (ditto preserves macOS metadata)
         run: |
           set -euo pipefail
@@ -84,7 +57,6 @@ jobs:
           ZIP_NAME="Lexisub-${{ steps.ver.outputs.tag }}-macos-arm64.zip"
           ditto -c -k --keepParent --sequesterRsrc Lexisub.app "$ZIP_NAME"
           cp ../USER_GUIDE.ko.md .
-          cp ../USER_GUIDE.ko.html .
 
       - name: Build DMG (drag-and-drop installer)
         run: |
@@ -92,11 +64,10 @@ jobs:
           STAGING="dist/dmg-staging"
           rm -rf "$STAGING"
           mkdir -p "$STAGING"
-          # macOS-standard layout: app + Applications symlink + the guide.
+          # macOS-standard layout: app + Applications symlink + a tiny
+          # plain-text first-run note. Full user guide lives on GitHub
+          # so it's always up-to-date with the latest release.
           cp -R dist/Lexisub.app "$STAGING/Lexisub.app"
-          cp USER_GUIDE.ko.html "$STAGING/사용설명서.html"
-          cp USER_GUIDE.ko.md "$STAGING/사용설명서.md"
-          # First-run README written inline so users see it immediately
           cat > "$STAGING/처음 실행하는 법.txt" <<'EOF'
           Lexisub 처음 실행하는 법
           ─────────────────────────────────
@@ -113,10 +84,19 @@ jobs:
           4. 처음 영상을 처리하면 약 4GB의 AI 모델을 자동으로
              다운로드합니다(한 번만). 이후엔 즉시 동작합니다.
 
-          5. 자세한 사용 방법은 같은 폴더의 "사용설명서.html"을 더블클릭
-             하면 브라우저로 열립니다.
+          ─────────────────────────────────
+
+          📖 자세한 사용 설명서 (한국어, 항상 최신):
+          https://github.com/existmaster/lexisub/blob/main/USER_GUIDE.ko.md
+
+          앱을 실행한 뒤 메뉴바 [도움말] → [사용 설명서]를
+          클릭해도 위 페이지가 브라우저로 열립니다.
 
           ─────────────────────────────────
+
+          문제가 있으면:
+          https://github.com/existmaster/lexisub/issues
+
           EOF
           ln -s /Applications "$STAGING/Applications"
           DMG_NAME="Lexisub-${{ steps.ver.outputs.tag }}-macos-arm64.dmg"
@@ -135,7 +115,6 @@ jobs:
             dist/Lexisub-*.zip
             dist/Lexisub-*.dmg
             dist/USER_GUIDE.ko.md
-            dist/USER_GUIDE.ko.html
           if-no-files-found: error
 
       - name: Attach to GitHub Release
@@ -147,5 +126,4 @@ jobs:
             dist/Lexisub-*.zip
             dist/Lexisub-*.dmg
             dist/USER_GUIDE.ko.md
-            dist/USER_GUIDE.ko.html
           fail_on_unmatched_files: true
